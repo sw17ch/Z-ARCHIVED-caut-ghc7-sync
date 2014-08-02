@@ -41,6 +41,8 @@ renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
                  , linebreak
                  , typeDecls
                  , linebreak
+                 , typeSizers
+                 , linebreak
                  ]
 
     hsMod = "module Cauterize." <> (text . nameToCapHsName $ n) <+> "where"
@@ -49,10 +51,11 @@ renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
                    , "import Data.Serialize"
                    , "import Data.Word"
                    , "import Data.Int"
-                   , "import Data.Vector"
+                   , "import qualified Data.Vector as V"
                    ]
 
     typeDecls = vcat $ map typeDecl ts
+    typeSizers = vcat $ map typeSizer ts
 
 typeDecl :: SpType -> Doc
 typeDecl t@(BuiltIn b _ _) = "type" <+> typeToTypeNameDoc t <+> "=" <+> biRepr (unTBuiltIn b)
@@ -61,30 +64,32 @@ typeDecl t@(Scalar b _ _) =
   in "newtype" <+> tnd <+> "=" <+> tnd <+> spacedBraces ("un" <> tnd <+> "::" <+> biRepr (scalarRepr b))
 typeDecl t@(Const {}) =
   let tnd = typeToTypeNameDoc t
-  in "data" <+> tnd <+> "=" <+> tnd
+  in tnd `dataDecl` tnd
 typeDecl t@(FixedArray (TFixedArray _ r _) _ _) =
   let tnd = typeToTypeNameDoc t
       elemName = (sNameToVarNameDoc . typeName) t <> "Elements"
       rnd = sNameToTypeNameDoc r
-  in "data" <+> tnd <+> "=" <+> tnd <+> spacedBraces (elemName <+> ":: Vector" <+> rnd)
+  in tnd `dataDecl` tnd <+> spacedBraces (elemName <+> ":: Vector" <+> rnd)
 typeDecl t@(BoundedArray (TBoundedArray _ r _) _ _ repr) =
   let tnd = typeToTypeNameDoc t
       rnd = sNameToTypeNameDoc r
-      fieldPrefix = typeToTypeNameDoc t
+      fieldPrefix = typeToVarNameDoc t
       repnd = biRepr . unLengthRepr $ repr
-  in "data" <+> tnd <+> "=" <+> tnd <+>
+  in tnd `dataDecl` tnd <+>
       encloseSep "{ " (line <> "}") ", " [ fieldPrefix <> "Length ::" <+> repnd
                                          , fieldPrefix <> "Elements :: Vector" <+> rnd]
 typeDecl t@(Struct s _ _) =
   let tnd = typeToTypeNameDoc t
       prefix = typeToVarNameDoc t
       sfs = unFields . structFields $ s 
-  in "data" <+> tnd <+> "=" <+> tnd <+> encloseSep "{ " (line <> "}") ", " (mapMaybe (structFieldDecl prefix) sfs)
+  in tnd `dataDecl` tnd <+>
+    encloseSep "{ " (line <> "}") ", " (mapMaybe (structFieldDecl prefix) sfs)
 typeDecl t@(Set s _ _ _) =
   let tnd = typeToTypeNameDoc t
       prefix = typeToVarNameDoc t
       sfs = unFields . setFields $ s 
-  in "data" <+> tnd <+> "=" <+> tnd <+> encloseSep "{ " (line <> "}") ", " (mapMaybe (setFieldDecl prefix) sfs)
+  in tnd `dataDecl` tnd <+>
+    encloseSep "{ " (line <> "}") ", " (mapMaybe (setFieldDecl prefix) sfs)
 typeDecl t@(Enum e _ _ _) =
   let tnd = typeToTypeNameDoc t
       rhs = encloseSep " = " empty " | " $ map (enumFieldDecl tnd) (unFields . enumFields $ e)
@@ -96,6 +101,34 @@ typeDecl t@(Partial e _ _ _ _) =
 typeDecl t@(Pad {}) =
   let tnd = typeToTypeNameDoc t
   in "data" <+> tnd <+> "=" <+> tnd
+
+typeSizer :: SpType -> Doc
+typeSizer (BuiltIn (TBuiltIn t) _ s) = staticSize (biReprText t) s
+typeSizer (Scalar (TScalar n _) _ s) = staticSize (T.pack n) s
+typeSizer (Const (TConst n _ _) _ s) = staticSize (T.pack n) s
+typeSizer (FixedArray (TFixedArray n _ _) _ _) =
+  sizerInstance n (parens (sNameToTypeNameDoc n <+> "vec")) "(V.sum . V.map typeSizer) vec"
+typeSizer (BoundedArray (TBoundedArray n _ _) _ _ _) =
+  sizerInstance n (parens (sNameToTypeNameDoc n <+> "len" <+> "vec")) "typeSizer len + (V.sum . V.map typeSizer) vec"
+typeSizer (Struct (TStruct n (Fields fs)) _ _) =
+  let flabels = take (length fs) $ map (("f" `T.append`) . T.pack . show) ([0..] :: [Integer])
+  in sizerInstance n (parens (sNameToTypeNameDoc n <+> (text . T.unwords) flabels)) (text $ T.intercalate " + " (map ("typeSizer " `T.append`) flabels))
+typeSizer t = sizerInstance (typeName t) "(TheType f)" "?????????????????????????????"
+
+sizerInstance :: String -> Doc -> Doc -> Doc
+sizerInstance n pat rhs =
+  vcat [ "instance CauterizeSize" <+> sNameToTypeNameDoc n <+> "where"
+       , indent 2 $ "cautSize" <+> pat <+> "=" <+> rhs
+       ]
+
+fixedSizeDoc :: FixedSize -> Doc
+fixedSizeDoc = text . T.pack . show . unFixedSize
+
+staticSize :: T.Text -> FixedSize -> Doc
+staticSize n s =
+  vcat [ "instance CauterizeSize" <+> (text . nameToCapHsName) n <+> "where"
+       , indent 2 "cautSize _ =" <+> fixedSizeDoc s
+       ]
 
 -- TODO: Should we attempt to drop some annotation in the Haskell code that an
 -- empty field was left out?
@@ -119,6 +152,8 @@ enumFieldDecl :: Doc -> Field -> Doc
 enumFieldDecl prefix (EmptyField fn _) = prefix <> sNameToTypeNameDoc fn
 enumFieldDecl prefix (Field fn fr _) = prefix <> sNameToTypeNameDoc fn <+> sNameToTypeNameDoc fr
 
+dataDecl :: Doc -> Doc -> Doc
+dataDecl lhs rhs = "data" <+> lhs <+> "=" <+> rhs
 
 asType :: Doc -> Doc -> Doc
 asType lhs rhs = lhs <+> "::" <+> rhs
@@ -136,17 +171,20 @@ typeToVarNameDoc :: SpType -> Doc
 typeToVarNameDoc = sNameToVarNameDoc . typeName
 
 biRepr :: BuiltIn -> Doc
-biRepr BIu8 = "Word8"
-biRepr BIu16 = "Word16"
-biRepr BIu32 = "Word32"
-biRepr BIu64 = "Word64"
-biRepr BIs8 = "Int8"
-biRepr BIs16 = "Int16"
-biRepr BIs32 = "Int32"
-biRepr BIs64 = "Int64"
-biRepr BIieee754s = "Float"
-biRepr BIieee754d = "Double"
-biRepr BIbool = "Bool"
+biRepr = text . biReprText
+
+biReprText :: BuiltIn -> T.Text
+biReprText BIu8 = "Word8"
+biReprText BIu16 = "Word16"
+biReprText BIu32 = "Word32"
+biReprText BIu64 = "Word64"
+biReprText BIs8 = "Int8"
+biReprText BIs16 = "Int16"
+biReprText BIs32 = "Int32"
+biReprText BIs64 = "Int64"
+biReprText BIieee754s = "Float"
+biReprText BIieee754d = "Double"
+biReprText BIbool = "Bool"
 
 spacedBraces :: Doc -> Doc
 spacedBraces p = braces $ " " <> p <> " "
