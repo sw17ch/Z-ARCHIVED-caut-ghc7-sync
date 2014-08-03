@@ -118,7 +118,19 @@ typeSizer (Set (TSet n (Fields fs)) _ _ _) =
   let flabels = fieldArgs fs
   in sizerInstance n (withTypeMatchFields "t" n flabels)
                      (encloseSep " = " empty " + " ("(cautSize . tagRepr) t" : map (\x -> text $ "maybe 0 typeSizer " `T.append` x) flabels))
+typeSizer t@(Enum (TEnum n (Fields fs)) _ _ _) =
+  let sizedFields = align . vcat $ map (enumFieldSizer (typeToTypeNameDoc t)) fs
+      rhs = align $ "let" <+> (align . vcat) [ "tags = cautSize . tagRepr $ t"
+                                     , "typs = case e of" <$> indent 12 sizedFields
+                                     ]
+                    <$> "in tags + typs"
+  in sizerInstance n "e" $ " = " <> rhs
+
 typeSizer t = sizerInstance (typeName t) "(TheType f)" "= ?????????????????????????????"
+
+enumFieldSizer :: Doc -> Field -> Doc
+enumFieldSizer prefix (EmptyField n _) = prefix <> sNameToTypeNameDoc n <+> "-> 0"
+enumFieldSizer prefix (Field n _ _) = prefix <> sNameToTypeNameDoc n <+> "t -> typeSizer t"
 
 withTypeMatchFields :: Doc -> String -> [T.Text] -> Doc
 withTypeMatchFields t n flabels = t <> "@" <> parens (sNameToTypeNameDoc n <+> (text . T.unwords) flabels)
