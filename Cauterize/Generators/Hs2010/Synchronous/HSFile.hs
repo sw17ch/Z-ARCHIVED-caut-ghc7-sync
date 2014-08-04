@@ -121,12 +121,19 @@ typeSizer (Set (TSet n (Fields fs)) _ _ _) =
 typeSizer t@(Enum (TEnum n (Fields fs)) _ _ _) =
   let sizedFields = align . vcat $ map (enumFieldSizer (typeToTypeNameDoc t)) fs
       rhs = align $ "let" <+> (align . vcat) [ "tags = cautSize . tagRepr $ t"
-                                     , "typs = case e of" <$> indent 12 sizedFields
-                                     ]
+                                             , "typs = case e of" <$> indent 12 sizedFields
+                                             ]
                     <$> "in tags + typs"
   in sizerInstance n "e" $ " = " <> rhs
-
-typeSizer t = sizerInstance (typeName t) "(TheType f)" "= ?????????????????????????????"
+typeSizer t@(Partial (TPartial n (Fields fs)) _ _ _ _) =
+  let sizedFields = align . vcat $ map (enumFieldSizer (typeToTypeNameDoc t)) fs
+      rhs = align $ "let" <+> (align . vcat) [ "tags = cautSize . tagRepr $ t"
+                                             , "lens = cautSize . lenRepr $ t"
+                                             , "typs = case e of" <$> indent 12 sizedFields
+                                             ]
+                    <$> "in tags + lens + typs"
+  in sizerInstance n "e" $ " = " <> rhs
+typeSizer (Pad (TPad n l) _ _) = sizerInstance n "_" $ " = " <> integer l
 
 enumFieldSizer :: Doc -> Field -> Doc
 enumFieldSizer prefix (EmptyField n _) = prefix <> sNameToTypeNameDoc n <+> "-> 0"
