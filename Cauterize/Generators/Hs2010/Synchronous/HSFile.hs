@@ -6,8 +6,6 @@ module Cauterize.Generators.Hs2010.Synchronous.HSFile
 
 import Cauterize.Specification
 import Cauterize.Common.Types
-import Cauterize.Common.Primitives
-import Cauterize.Common.Field
 
 import qualified Data.Char as C
 import qualified Data.Text.Lazy as T
