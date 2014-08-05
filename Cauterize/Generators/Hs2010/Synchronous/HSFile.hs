@@ -66,12 +66,12 @@ typeDecl t@(Scalar b _ _) =
 typeDecl t@(Const {}) =
   let tnd = typeToTypeNameDoc t
   in tnd `dataDecl` tnd
-typeDecl t@(FixedArray (TFixedArray _ r _) _ _) =
+typeDecl t@(Array (TArray _ r _) _ _) =
   let tnd = typeToTypeNameDoc t
       elemName = (sNameToVarNameDoc . typeName) t <> "Elements"
       rnd = sNameToTypeNameDoc r
   in tnd `dataDecl` tnd <+> spacedBraces (elemName <+> ":: Vector" <+> rnd)
-typeDecl t@(BoundedArray (TBoundedArray _ r _) _ _ repr) =
+typeDecl t@(Vector (TVector _ r _) _ _ repr) =
   let tnd = typeToTypeNameDoc t
       rnd = sNameToTypeNameDoc r
       fieldPrefix = typeToVarNameDoc t
@@ -103,9 +103,9 @@ typeSizer :: SpType -> Doc
 typeSizer (BuiltIn (TBuiltIn t) _ s) = staticSize (biReprText t) s
 typeSizer (Scalar (TScalar n _) _ s) = staticSize (T.pack n) s
 typeSizer (Const (TConst n _ _) _ s) = staticSize (T.pack n) s
-typeSizer (FixedArray (TFixedArray n _ _) _ _) =
+typeSizer (Array (TArray n _ _) _ _) =
   sizerInstance n (parens (sNameToTypeNameDoc n <+> "vec")) " = (V.sum . V.map typeSizer) vec"
-typeSizer (BoundedArray (TBoundedArray n _ _) _ _ _) =
+typeSizer (Vector (TVector n _ _) _ _ _) =
   sizerInstance n (parens (sNameToTypeNameDoc n <+> "len" <+> "vec")) " = typeSizer len + (V.sum . V.map typeSizer) vec"
 typeSizer (Struct (TStruct n (Fields fs)) _ _) =
   let flabels = fieldArgs fs
