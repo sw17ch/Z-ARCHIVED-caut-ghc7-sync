@@ -52,6 +52,7 @@ renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
                    , "import Data.Word"
                    , "import Data.Int"
                    , "import qualified Data.Vector as V"
+                   , "import Cauterize.Support.Hs2010"
                    ]
 
     typeDecls = vcat $ map typeDecl ts
@@ -94,10 +95,6 @@ typeDecl t@(Enum e _ _ _) =
   let tnd = typeToTypeNameDoc t
       rhs = encloseSep " = " empty " | " $ map (enumFieldDecl tnd) (unFields . enumFields $ e)
   in "data" <+> tnd <> rhs
-typeDecl t@(Partial e _ _ _ _) =
-  let tnd = typeToTypeNameDoc t
-      rhs = encloseSep " = " empty " | " $ map (enumFieldDecl tnd) (unFields . partialFields $ e)
-  in "data" <+> tnd <> rhs
 typeDecl t@(Pad {}) =
   let tnd = typeToTypeNameDoc t
   in "data" <+> tnd <+> "=" <+> tnd
@@ -124,14 +121,6 @@ typeSizer t@(Enum (TEnum n (Fields fs)) _ _ _) =
                                              , "typs = case e of" <$> indent 12 sizedFields
                                              ]
                     <$> "in tags + typs"
-  in sizerInstance n "e" $ " = " <> rhs
-typeSizer t@(Partial (TPartial n (Fields fs)) _ _ _ _) =
-  let sizedFields = align . vcat $ map (enumFieldSizer (typeToTypeNameDoc t)) fs
-      rhs = align $ "let" <+> (align . vcat) [ "tags = cautSize . tagRepr $ t"
-                                             , "lens = cautSize . lenRepr $ t"
-                                             , "typs = case e of" <$> indent 12 sizedFields
-                                             ]
-                    <$> "in tags + lens + typs"
   in sizerInstance n "e" $ " = " <> rhs
 typeSizer (Pad (TPad n l) _ _) = sizerInstance n "_" $ " = " <> integer l
 
