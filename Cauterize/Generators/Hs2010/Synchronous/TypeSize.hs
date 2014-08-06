@@ -16,6 +16,12 @@ lkup :: Name -> M.Map Name SpType -> SpType
 lkup n m = let e = error $ "MISTAKE: Unable to lookup name " ++ n ++ " in spec type map."
            in fromMaybe e $ n `M.lookup` m
 
+minSizeFromSize :: (Sized s) => s -> Doc
+minSizeFromSize s = "minSize _ = " <> integer (minSize s)
+
+maxSizeFromSize :: (Sized s) => s -> Doc
+maxSizeFromSize s = "maxSize _ = " <> integer (maxSize s)
+
 typeSizer :: M.Map Name SpType -> SpType -> Doc
 typeSizer _ (BuiltIn {}) = empty
 typeSizer m t = let n = typeName t
@@ -28,8 +34,22 @@ typeSizer' _ (Scalar (TScalar n _) _ _) =
   in "cautSize (" <> tnd <> " x) = cautSize x"
 typeSizer' _ (Const (TConst _ b _) _ _) =
   "cautSize _ = cautSize (undefined :: " <> biRepr b <> ")"
-typeSizer' tm (Array (TArray _ b _) _ _) =
-  "cautSize _ = cautSize (undefined :: " <> typeToTypeNameDoc (b `lkup` tm) <> ")"
+typeSizer' _ t@(Array (TArray _ _ l) _ s) =
+  vcat [ "cautSize (" <> typeToTypeNameDoc t <> " v) = "
+          <> align ("if " <> integer l <> " != V.length v"
+            <$> indent 2 "then Nothing"
+            <$> indent 2 "else liftM V.sum $ V.mapM cautSize v")
+       , minSizeFromSize s
+       , maxSizeFromSize s
+       ]
+typeSizer' _ t@(Vector (TVector _ _ l) _ s _) =
+  vcat [ "cautSize (" <> typeToTypeNameDoc t <> " v) = "
+          <> align ("if " <> integer l <> " < V.length v"
+            <$> indent 2 "then Nothing"
+            <$> indent 2 "else liftM V.sum $ V.mapM cautSize v")
+       , minSizeFromSize s
+       , maxSizeFromSize s
+       ]
 typeSizer' _ _ = "????????????????????????????????????"
           
 {-

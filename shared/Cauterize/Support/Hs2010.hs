@@ -19,14 +19,15 @@ module Cauterize.Support.Hs2010
 
 import Data.Word
 import Data.Int
+import Data.Maybe
 
 class CauterizeSize a where
-  cautSize :: a -> Integer
+  cautSize :: a -> Maybe Integer
   minSize :: a -> Integer
   minSize = maxSize
 
   maxSize :: a -> Integer
-  maxSize = cautSize
+  maxSize = fromJust . cautSize
 
 class CauterizeTagged a where
   cautTag :: a -> Integer
@@ -49,36 +50,38 @@ type Ieee754s = Float
 type Ieee754d = Double
 -- Just use Haskell's Bool for the built-in bool.
 
+justConst :: a -> b -> Maybe a
+justConst a _ = Just a
 
 instance CauterizeSize U8 where
-  cautSize = const 1
+  cautSize = justConst 1
 
 instance CauterizeSize U16 where
-  cautSize = const 2
+  cautSize = justConst 2
 
 instance CauterizeSize U32 where
-  cautSize = const 4
+  cautSize = justConst 4
 
 instance CauterizeSize U64 where
-  cautSize = const 8
+  cautSize = justConst 8
 
 instance CauterizeSize S8 where
-  cautSize = const 1
+  cautSize = justConst 1
 
 instance CauterizeSize S16 where
-  cautSize = const 2
+  cautSize = justConst 2
 
 instance CauterizeSize S32 where
-  cautSize = const 4
+  cautSize = justConst 4
 
 instance CauterizeSize S64 where
-  cautSize = const 8
+  cautSize = justConst 8
 
 instance CauterizeSize Ieee754s where
-  cautSize = const 4
+  cautSize = justConst 4
 
 instance CauterizeSize Ieee754d where
-  cautSize = const 8
+  cautSize = justConst 8
 
 instance CauterizeSize Bool where
-  cautSize = const 1
+  cautSize = justConst 1
