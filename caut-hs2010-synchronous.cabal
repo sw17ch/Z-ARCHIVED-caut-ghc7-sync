@@ -27,6 +27,7 @@ executable caut-hs2010-synchronous
                        filepath ==1.3.0.*,
                        wl-pprint-text ==1.1.0.*,
                        text ==1.1.1.*,
+                       containers ==0.5.*,
                        cauterize-core <=0.1.0.0
   -- hs-source-dirs:      
   default-language:    Haskell2010

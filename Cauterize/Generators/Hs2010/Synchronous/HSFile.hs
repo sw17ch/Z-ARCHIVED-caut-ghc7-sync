@@ -17,6 +17,7 @@ import Text.PrettyPrint.Leijen.Text
 renderHSFile :: Spec -> T.Text
 renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
   where
+    tm = specTypeMap s
     n = T.pack $ specName s
     r = renderPretty 0.4 80
     ts = specTypes s
@@ -39,4 +40,4 @@ renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
                    ]
 
     typeDecls = vcat $ map typeDecl ts
-    typeSizers = vcat $ map typeSizer ts
+    typeSizers = vcat $ map (typeSizer tm) ts

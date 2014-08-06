@@ -11,7 +11,7 @@ import Text.PrettyPrint.Leijen.Text
 import Data.Maybe
 
 typeDecl :: SpType -> Doc
-typeDecl t@(BuiltIn b _ _) = "type" <+> typeToTypeNameDoc t <+> "=" <+> biRepr (unTBuiltIn b)
+typeDecl (BuiltIn {}) = empty
 typeDecl t@(Scalar b _ _) =
   let tnd = typeToTypeNameDoc t
   in "newtype" <+> tnd <+> "=" <+> tnd <+> spacedBraces ("un" <> tnd <+> "::" <+> biRepr (scalarRepr b))

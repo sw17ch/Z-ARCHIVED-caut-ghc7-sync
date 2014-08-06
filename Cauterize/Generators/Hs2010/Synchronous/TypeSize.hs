@@ -9,9 +9,32 @@ import Cauterize.Generators.Hs2010.Synchronous.Common
 
 import Text.PrettyPrint.Leijen.Text
 import qualified Data.Text.Lazy as T
+import qualified Data.Map as M
+import Data.Maybe
 
+lkup :: Name -> M.Map Name SpType -> SpType
+lkup n m = let e = error $ "MISTAKE: Unable to lookup name " ++ n ++ " in spec type map."
+           in fromMaybe e $ n `M.lookup` m
+
+typeSizer :: M.Map Name SpType -> SpType -> Doc
+typeSizer _ (BuiltIn {}) = empty
+typeSizer m t = let n = typeName t
+                in "instance CauterizeSize" <+> sNameToTypeNameDoc n <+> "where" <$> indent 2 (typeSizer' m t)
+                 
+typeSizer' :: M.Map Name SpType -> SpType -> Doc
+typeSizer' _ (BuiltIn {}) = error "Should never reach this."
+typeSizer' _ (Scalar (TScalar n _) _ _) =
+  let tnd = sNameToTypeNameDoc n
+  in "cautSize (" <> tnd <> " x) = cautSize x"
+typeSizer' _ (Const (TConst _ b _) _ _) =
+  "cautSize _ = cautSize (undefined :: " <> biRepr b <> ")"
+typeSizer' tm (Array (TArray _ b _) _ _) =
+  "cautSize _ = cautSize (undefined :: " <> typeToTypeNameDoc (b `lkup` tm) <> ")"
+typeSizer' _ _ = "????????????????????????????????????"
+          
+{-
 typeSizer :: SpType -> Doc
-typeSizer (BuiltIn (TBuiltIn t) _ s) = staticSize (biReprText t) s
+typeSizer (BuiltIn {}) = empty
 typeSizer (Scalar (TScalar n _) _ s) = staticSize (T.pack n) s
 typeSizer (Const (TConst n _ _) _ s) = staticSize (T.pack n) s
 typeSizer (Array (TArray n _ _) _ _) =
@@ -62,3 +85,4 @@ staticSize n s =
   vcat [ "instance CauterizeSize" <+> (text . nameToCapHsName) n <+> "where"
        , indent 2 "cautSize _ =" <+> fixedSizeDoc s
        ]
+       -}

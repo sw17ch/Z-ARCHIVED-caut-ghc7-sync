@@ -52,16 +52,16 @@ biRepr :: BuiltIn -> Doc
 biRepr = text . biReprText
 
 biReprText :: BuiltIn -> T.Text
-biReprText BIu8 = "Word8"
-biReprText BIu16 = "Word16"
-biReprText BIu32 = "Word32"
-biReprText BIu64 = "Word64"
-biReprText BIs8 = "Int8"
-biReprText BIs16 = "Int16"
-biReprText BIs32 = "Int32"
-biReprText BIs64 = "Int64"
-biReprText BIieee754s = "Float"
-biReprText BIieee754d = "Double"
+biReprText BIu8 = "U8"
+biReprText BIu16 = "U16"
+biReprText BIu32 = "U32"
+biReprText BIu64 = "U64"
+biReprText BIs8 = "S8"
+biReprText BIs16 = "S16"
+biReprText BIs32 = "S32"
+biReprText BIs64 = "S64"
+biReprText BIieee754s = "Ieee754s"
+biReprText BIieee754d = "Ieee754d"
 biReprText BIbool = "Bool"
 
 spacedBraces :: Doc -> Doc
