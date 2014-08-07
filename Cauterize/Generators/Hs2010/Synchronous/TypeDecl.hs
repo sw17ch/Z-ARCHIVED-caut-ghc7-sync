@@ -75,6 +75,3 @@ setFieldDecl nameSpace (Field fn fr _) =
 enumFieldDecl :: Doc -> Field -> Doc
 enumFieldDecl prefix (EmptyField fn _) = prefix <> sNameToTypeNameDoc fn
 enumFieldDecl prefix (Field fn fr _) = prefix <> sNameToTypeNameDoc fn <+> sNameToTypeNameDoc fr
-
-asType :: Doc -> Doc -> Doc
-asType lhs rhs = lhs <+> "::" <+> rhs

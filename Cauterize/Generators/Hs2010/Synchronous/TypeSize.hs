@@ -50,7 +50,19 @@ typeSizer' _ t@(Vector (TVector _ _ l) _ s _) =
        , minSizeFromSize s
        , maxSizeFromSize s
        ]
+typeSizer' _ (Struct (TStruct n (Fields fs)) _ s) =
+  let objName = "s"
+      fsizes = punctuate " + " $ map (fieldSizer objName $ sNameToVarNameDoc n) fs
+  in vcat [ "cautSize" <+> objName <+> "=" <+> align (sep fsizes)
+          , minSizeFromSize s
+          , maxSizeFromSize s
+          ]
+
 typeSizer' _ _ = "????????????????????????????????????"
+
+fieldSizer :: Doc -> Doc -> Field -> Doc
+fieldSizer _ _ (EmptyField _ _) = "0"
+fieldSizer objName nameSpace (Field n _ _) = "cautSize (" <> nameSpace <> sNameToTypeNameDoc n <+> objName <> ")"
           
 {-
 typeSizer :: SpType -> Doc

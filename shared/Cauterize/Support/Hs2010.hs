@@ -37,7 +37,6 @@ class CauterizeFlags a where
   cautFlags :: a -> Integer
   cautFlagsSize :: a -> Integer
 
-
 type U8 = Word8
 type U16 = Word16
 type U32 = Word32

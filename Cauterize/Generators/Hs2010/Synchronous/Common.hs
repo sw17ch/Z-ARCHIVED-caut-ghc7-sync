@@ -10,6 +10,8 @@ module Cauterize.Generators.Hs2010.Synchronous.Common
   , nameToCapHsName
 
   , spacedBraces
+  , fieldDecl
+  , asType
   ) where
 
 import Cauterize.Specification
@@ -66,3 +68,15 @@ biReprText BIbool = "Bool"
 
 spacedBraces :: Doc -> Doc
 spacedBraces p = braces $ " " <> p <> " "
+
+-- TODO: Should we attempt to drop some annotation in the Haskell code that an
+-- empty field was left out?
+fieldDecl :: Doc -> Field -> Maybe Doc
+fieldDecl _ (EmptyField _ _) = Nothing
+fieldDecl nameSpace (Field fn fr _) =
+  let fn' = nameSpace <> sNameToTypeNameDoc fn
+      fr' = sNameToTypeNameDoc fr
+  in Just $ fn' `asType` fr'
+
+asType :: Doc -> Doc -> Doc
+asType lhs rhs = lhs <+> "::" <+> rhs
