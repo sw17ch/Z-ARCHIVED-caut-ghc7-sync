@@ -52,17 +52,33 @@ typeSizer' _ t@(Vector (TVector _ _ l) _ s _) =
        ]
 typeSizer' _ (Struct (TStruct n (Fields fs)) _ s) =
   let objName = "s"
-      fsizes = punctuate " + " $ map (fieldSizer objName $ sNameToVarNameDoc n) fs
+      fsizes = punctuate " + " $ map (structFieldSizer objName $ sNameToVarNameDoc n) fs
   in vcat [ "cautSize" <+> objName <+> "=" <+> align (sep fsizes)
+          , minSizeFromSize s
+          , maxSizeFromSize s
+          ]
+typeSizer' _ (Set (TSet n (Fields fs)) _ s (FlagsRepr r)) =
+  let objName = "s"
+      repName = biRepr r
+      fsizes = punctuate " + " $ map (setFieldSizer objName $ sNameToVarNameDoc n) fs
+  in vcat [ "cautSize" <+> objName <+> "=" <+> align ("let repSize = cautSize (undefined :: " <> repName <> ")"
+                                                  <$> "    fieldsSize = " <> align (sep fsizes)
+                                                  <$> "in repSize + fieldsSize")
           , minSizeFromSize s
           , maxSizeFromSize s
           ]
 
 typeSizer' _ _ = "????????????????????????????????????"
 
-fieldSizer :: Doc -> Doc -> Field -> Doc
-fieldSizer _ _ (EmptyField _ _) = "0"
-fieldSizer objName nameSpace (Field n _ _) = "cautSize (" <> nameSpace <> sNameToTypeNameDoc n <+> objName <> ")"
+structFieldSizer :: Doc -> Doc -> Field -> Doc
+structFieldSizer _ _ (EmptyField _ _) = "0"
+structFieldSizer objName nameSpace (Field n _ _) =
+  "cautSize (" <> nameSpace <> sNameToTypeNameDoc n <+> objName <> ")"
+
+setFieldSizer :: Doc -> Doc -> Field -> Doc
+setFieldSizer _ _ (EmptyField _ _) = "0"
+setFieldSizer objName nameSpace (Field n _ _) =
+  "maybe 0 cautSize (" <> nameSpace <> sNameToTypeNameDoc n <+> objName <> ")"
           
 {-
 typeSizer :: SpType -> Doc
