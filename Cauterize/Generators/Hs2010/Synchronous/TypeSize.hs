@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, ViewPatterns #-}
 module Cauterize.Generators.Hs2010.Synchronous.TypeSize
   ( typeSizer
   ) where
@@ -8,7 +8,6 @@ import Cauterize.Common.Types
 import Cauterize.Generators.Hs2010.Synchronous.Common
 
 import Text.PrettyPrint.Leijen.Text
-import qualified Data.Text.Lazy as T
 import qualified Data.Map as M
 import Data.Maybe
 
@@ -25,7 +24,8 @@ maxSizeFromSize s = "maxSize _ = " <> integer (maxSize s)
 typeSizer :: M.Map Name SpType -> SpType -> Doc
 typeSizer _ (BuiltIn {}) = empty
 typeSizer m t = let n = typeName t
-                in "instance CauterizeSize" <+> sNameToTypeNameDoc n <+> "where" <$> indent 2 (typeSizer' m t)
+                    inst = "instance CauterizeSize" <+> sNameToTypeNameDoc n <+> "where" <$> indent 2 (typeSizer' m t)
+                in inst <> linebreak
                  
 typeSizer' :: M.Map Name SpType -> SpType -> Doc
 typeSizer' _ (BuiltIn {}) = error "Should never reach this."
@@ -67,8 +67,33 @@ typeSizer' _ (Set (TSet n (Fields fs)) _ s (FlagsRepr r)) =
           , minSizeFromSize s
           , maxSizeFromSize s
           ]
+typeSizer' _ (Enum (TEnum n (Fields fs)) _ s (TagRepr r)) =
+  let objName = "e"
+      fieldVar = "e'"
+      repName = biRepr r
+      enumCase f = let lhs = enumFieldCaseMatch fieldVar (sNameToTypeNameDoc n) f
+                       rhs = enumFieldSizer fieldVar f
+                   in lhs <+> rhs
+      fcases = map enumCase fs
+      caseBlob = align $ "e of" <$> vcat fcases
+      lets = "let" <+> align ( "repSize = cautSize (undefined :: " <> repName <> ")"
+                           <$> "fieldsSize = case " <> caseBlob)
+      ins = "in repSize + fieldsSize"
+  in vcat [ "cautSize" <+> objName <+> "=" <+> align (lets <$> ins)
+          , minSizeFromSize s
+          , maxSizeFromSize s
+          ] 
+typeSizer' _ (Pad (TPad _ l) _ _) =
+  vcat [ "cautSize _ = " <> integer l
+       ] 
 
-typeSizer' _ _ = "????????????????????????????????????"
+enumFieldCaseMatch :: Doc -> Doc -> Field -> Doc
+enumFieldCaseMatch _ nameSpace (EmptyField n _) = nameSpace <> sNameToTypeNameDoc n <+> "->"
+enumFieldCaseMatch var nameSpace (Field n _ _) = nameSpace <> sNameToTypeNameDoc n <+> var <+> "->"
+
+enumFieldSizer :: Doc -> Field -> Doc
+enumFieldSizer _ (EmptyField {}) = "0"
+enumFieldSizer fieldVar (Field {}) = "cautSize" <+> fieldVar
 
 structFieldSizer :: Doc -> Doc -> Field -> Doc
 structFieldSizer _ _ (EmptyField _ _) = "0"
@@ -79,58 +104,3 @@ setFieldSizer :: Doc -> Doc -> Field -> Doc
 setFieldSizer _ _ (EmptyField _ _) = "0"
 setFieldSizer objName nameSpace (Field n _ _) =
   "maybe 0 cautSize (" <> nameSpace <> sNameToTypeNameDoc n <+> objName <> ")"
-          
-{-
-typeSizer :: SpType -> Doc
-typeSizer (BuiltIn {}) = empty
-typeSizer (Scalar (TScalar n _) _ s) = staticSize (T.pack n) s
-typeSizer (Const (TConst n _ _) _ s) = staticSize (T.pack n) s
-typeSizer (Array (TArray n _ _) _ _) =
-  sizerInstance n (parens (sNameToTypeNameDoc n <+> "vec")) " = (V.sum . V.map typeSizer) vec"
-typeSizer (Vector (TVector n _ _) _ _ _) =
-  sizerInstance n (parens (sNameToTypeNameDoc n <+> "len" <+> "vec")) " = typeSizer len + (V.sum . V.map typeSizer) vec"
-typeSizer (Struct (TStruct n (Fields fs)) _ _) =
-  let flabels = fieldArgs fs
-  in sizerInstance n (matchFields n flabels)
-                     (encloseSep " = " empty " + " (map (\x -> text $ "typeSizer " `T.append` x) flabels))
-typeSizer (Set (TSet n (Fields fs)) _ _ _) =
-  let flabels = fieldArgs fs
-  in sizerInstance n (withTypeMatchFields "t" n flabels)
-                     (encloseSep " = " empty " + " ("(cautSize . tagRepr) t" : map (\x -> text $ "maybe 0 typeSizer " `T.append` x) flabels))
-typeSizer t@(Enum (TEnum n (Fields fs)) _ _ _) =
-  let sizedFields = align . vcat $ map (enumFieldSizer (typeToTypeNameDoc t)) fs
-      rhs = align $ "let" <+> (align . vcat) [ "tags = cautSize . tagRepr $ t"
-                                             , "typs = case e of" <$> indent 12 sizedFields
-                                             ]
-                    <$> "in tags + typs"
-  in sizerInstance n "e" $ " = " <> rhs
-typeSizer (Pad (TPad n l) _ _) = sizerInstance n "_" $ " = " <> integer l
-
-enumFieldSizer :: Doc -> Field -> Doc
-enumFieldSizer prefix (EmptyField n _) = prefix <> sNameToTypeNameDoc n <+> "-> 0"
-enumFieldSizer prefix (Field n _ _) = prefix <> sNameToTypeNameDoc n <+> "t -> typeSizer t"
-
-withTypeMatchFields :: Doc -> String -> [T.Text] -> Doc
-withTypeMatchFields t n flabels = t <> "@" <> parens (sNameToTypeNameDoc n <+> (text . T.unwords) flabels)
-
-matchFields :: String -> [T.Text] -> Doc
-matchFields n flabels = parens $ sNameToTypeNameDoc n <+> (text . T.unwords) flabels
-
-fieldArgs :: [a] -> [T.Text]
-fieldArgs fs = take (length fs) $ map (("f" `T.append`) . T.pack . show) ([0..] :: [Integer])
-
-sizerInstance :: String -> Doc -> Doc -> Doc
-sizerInstance n pat rhs =
-  vcat [ "instance CauterizeSize" <+> sNameToTypeNameDoc n <+> "where"
-       , indent 2 $ "cautSize" <+> pat <> rhs
-       ]
-
-fixedSizeDoc :: FixedSize -> Doc
-fixedSizeDoc = text . T.pack . show . unFixedSize
-
-staticSize :: T.Text -> FixedSize -> Doc
-staticSize n s =
-  vcat [ "instance CauterizeSize" <+> (text . nameToCapHsName) n <+> "where"
-       , indent 2 "cautSize _ =" <+> fixedSizeDoc s
-       ]
-       -}
