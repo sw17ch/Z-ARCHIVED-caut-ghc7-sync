@@ -19,18 +19,11 @@ typeDecl t@(Const {}) =
   let tnd = typeToTypeNameDoc t
   in tnd `dataDecl` tnd
 typeDecl t@(Array (TArray _ r _) _ _) =
-  let tnd = typeToTypeNameDoc t
-      elemName = (sNameToVarNameDoc . typeName) t <> "Elements"
-      rnd = sNameToTypeNameDoc r
-  in tnd `dataDecl` tnd <+> spacedBraces (elemName <+> ":: Vector" <+> rnd)
-typeDecl t@(Vector (TVector _ r _) _ _ repr) =
-  let tnd = typeToTypeNameDoc t
-      rnd = sNameToTypeNameDoc r
-      fieldPrefix = typeToVarNameDoc t
-      repnd = biRepr . unLengthRepr $ repr
-  in tnd `dataDecl` tnd <+>
-      encloseSep "{ " (line <> "}") ", " [ fieldPrefix <> "Length ::" <+> repnd
-                                         , fieldPrefix <> "Elements :: Vector" <+> rnd]
+  let elemName = (sNameToVarNameDoc . typeName) t <> "Elements"
+  in arrDecl (typeToTypeNameDoc t) elemName (sNameToTypeNameDoc r)
+typeDecl t@(Vector (TVector _ r _) _ _ _) =
+  let elemName = (sNameToVarNameDoc . typeName) t <> "Elements"
+  in arrDecl (typeToTypeNameDoc t) elemName (sNameToTypeNameDoc r)
 typeDecl t@(Struct s _ _) =
   let tnd = typeToTypeNameDoc t
       prefix = typeToVarNameDoc t
@@ -50,6 +43,10 @@ typeDecl t@(Enum e _ _ _) =
 typeDecl t@(Pad {}) =
   let tnd = typeToTypeNameDoc t
   in "data" <+> tnd <+> "=" <+> tnd
+
+arrDecl :: Doc -> Doc -> Doc -> Doc
+arrDecl tName elemName refName =
+  tName `dataDecl` tName <+> spacedBraces (elemName <+> ":: Vector" <+> refName)
 
 dataDecl :: Doc -> Doc -> Doc
 dataDecl lhs rhs = "data" <+> lhs <+> "=" <+> rhs

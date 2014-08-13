@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Cauterize.Generators.Hs2010.Synchronous.TypeSize
   ( typeSizer
   ) where
@@ -9,11 +9,9 @@ import Cauterize.Generators.Hs2010.Synchronous.Common
 
 import Text.PrettyPrint.Leijen.Text
 import qualified Data.Map as M
-import Data.Maybe
 
-lkup :: Name -> M.Map Name SpType -> SpType
-lkup n m = let e = error $ "MISTAKE: Unable to lookup name " ++ n ++ " in spec type map."
-           in fromMaybe e $ n `M.lookup` m
+sizeFn :: Doc
+sizeFn = "cautSize"
 
 minSizeFromSize :: (Sized s) => s -> Doc
 minSizeFromSize s = "minSize _ = " <> integer (minSize s)
@@ -29,44 +27,32 @@ typeSizer m t = let n = typeName t
                  
 typeSizer' :: M.Map Name SpType -> SpType -> Doc
 typeSizer' _ (BuiltIn {}) = error "Should never reach this."
-typeSizer' _ (Scalar (TScalar n _) _ _) =
-  let tnd = sNameToTypeNameDoc n
-  in "cautSize (" <> tnd <> " x) = cautSize x"
-typeSizer' _ (Const (TConst _ b _) _ _) =
-  "cautSize _ = cautSize (undefined :: " <> biRepr b <> ")"
+typeSizer' _ (Scalar s _ _) = hsep [sizeFn, unpackScalarAs s "x", "=", sizeFn, "x"]
+typeSizer' _ (Const c _ _) = hsep [sizeFn, "_ =", sizeFn, constAsUndefined c]
 typeSizer' _ t@(Array (TArray _ _ l) _ s) =
-  vcat [ "cautSize (" <> typeToTypeNameDoc t <> " v) = "
-          <> align ("if " <> integer l <> " != V.length v"
-            <$> indent 2 "then Nothing"
-            <$> indent 2 "else liftM V.sum $ V.mapM cautSize v")
-       , minSizeFromSize s
-       , maxSizeFromSize s
-       ]
-typeSizer' _ t@(Vector (TVector _ _ l) _ s _) =
-  vcat [ "cautSize (" <> typeToTypeNameDoc t <> " v) = "
-          <> align ("if " <> integer l <> " < V.length v"
-            <$> indent 2 "then Nothing"
-            <$> indent 2 "else liftM V.sum $ V.mapM cautSize v")
-       , minSizeFromSize s
-       , maxSizeFromSize s
-       ]
+  varSizeInsts s $ 
+    "cautSize (" <> typeToTypeNameDoc t <> " v) = "
+     <> ifStmt (integer l <> " != V.length v")
+               "Nothing"
+               "liftM V.sum $ V.mapM cautSize v"
+typeSizer' _ t@(Vector (TVector _ _ l) _ s (LengthRepr r)) =
+  varSizeInsts s $ 
+    "cautSize (" <> typeToTypeNameDoc t <> " v) = "
+     <> ifStmt (integer l <> " < V.length v")
+               "Nothing"
+               "liftM (\\x -> cautSize" <+> builtinAsUndefined r <+> "+ V.sum x) $ V.mapM cautSize v"
 typeSizer' _ (Struct (TStruct n (Fields fs)) _ s) =
   let objName = "s"
       fsizes = punctuate " + " $ map (structFieldSizer objName $ sNameToVarNameDoc n) fs
-  in vcat [ "cautSize" <+> objName <+> "=" <+> align (sep fsizes)
-          , minSizeFromSize s
-          , maxSizeFromSize s
-          ]
+  in varSizeInsts s $ "cautSize" <+> objName <+> "=" <+> align (sep fsizes)
 typeSizer' _ (Set (TSet n (Fields fs)) _ s (FlagsRepr r)) =
   let objName = "s"
       repName = biRepr r
       fsizes = punctuate " + " $ map (setFieldSizer objName $ sNameToVarNameDoc n) fs
-  in vcat [ "cautSize" <+> objName <+> "=" <+> align ("let repSize = cautSize (undefined :: " <> repName <> ")"
-                                                  <$> "    fieldsSize = " <> align (sep fsizes)
-                                                  <$> "in repSize + fieldsSize")
-          , minSizeFromSize s
-          , maxSizeFromSize s
-          ]
+  in varSizeInsts s $
+    "cautSize" <+> objName <+> "=" <+> align ("let repSize = cautSize (undefined :: " <> repName <> ")"
+                                          <$> "    fieldsSize = " <> align (sep fsizes)
+                                          <$> "in repSize + fieldsSize")
 typeSizer' _ (Enum (TEnum n (Fields fs)) _ s (TagRepr r)) =
   let objName = "e"
       fieldVar = "e'"
@@ -79,10 +65,7 @@ typeSizer' _ (Enum (TEnum n (Fields fs)) _ s (TagRepr r)) =
       lets = "let" <+> align ( "repSize = cautSize (undefined :: " <> repName <> ")"
                            <$> "fieldsSize = case " <> caseBlob)
       ins = "in repSize + fieldsSize"
-  in vcat [ "cautSize" <+> objName <+> "=" <+> align (lets <$> ins)
-          , minSizeFromSize s
-          , maxSizeFromSize s
-          ] 
+  in varSizeInsts s $ "cautSize" <+> objName <+> "=" <+> align (lets <$> ins)
 typeSizer' _ (Pad (TPad _ l) _ _) =
   vcat [ "cautSize _ = " <> integer l
        ] 
@@ -98,9 +81,13 @@ enumFieldSizer fieldVar (Field {}) = "cautSize" <+> fieldVar
 structFieldSizer :: Doc -> Doc -> Field -> Doc
 structFieldSizer _ _ (EmptyField _ _) = "0"
 structFieldSizer objName nameSpace (Field n _ _) =
-  "cautSize (" <> nameSpace <> sNameToTypeNameDoc n <+> objName <> ")"
+  "cautSize" <+> parens (nameSpace <> sNameToTypeNameDoc n <+> objName)
 
 setFieldSizer :: Doc -> Doc -> Field -> Doc
 setFieldSizer _ _ (EmptyField _ _) = "0"
 setFieldSizer objName nameSpace (Field n _ _) =
-  "maybe 0 cautSize (" <> nameSpace <> sNameToTypeNameDoc n <+> objName <> ")"
+  "maybe 0 cautSize" <+> parens (nameSpace <> sNameToTypeNameDoc n <+> objName)
+
+varSizeInsts :: Sized s => s -> Doc -> Doc
+varSizeInsts sizeSpec sizeCheck =
+  vcat [ sizeCheck, minSizeFromSize sizeSpec, maxSizeFromSize sizeSpec]

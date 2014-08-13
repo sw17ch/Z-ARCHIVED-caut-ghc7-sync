@@ -1,8 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Cauterize.Support.Hs2010
   ( CauterizeSize(..)
-  , CauterizeTagged(..)
-  , CauterizeFlags(..)
+  , CauterizeSerialize(..)
 
   , U8
   , U16
@@ -20,6 +19,13 @@ module Cauterize.Support.Hs2010
 import Data.Word
 import Data.Int
 import Data.Maybe
+import Data.Bytes.Put
+import Data.Bytes.Get
+import qualified Data.ByteString as B
+import qualified Data.Serialize.Put as S
+import qualified Data.Serialize.Get as S
+
+import Control.Monad
 
 class CauterizeSize a where
   cautSize :: a -> Maybe Integer
@@ -29,13 +35,19 @@ class CauterizeSize a where
   maxSize :: a -> Integer
   maxSize = fromJust . cautSize
 
-class CauterizeTagged a where
-  cautTag :: a -> Integer
-  cautTagSize :: a -> Integer
+class CauterizeSerialize a where
+  cautPut :: a -> S.PutM (Either String ())
+  cautGet :: S.Get (Either String a)
 
-class CauterizeFlags a where
-  cautFlags :: a -> Integer
-  cautFlagsSize :: a -> Integer
+cauterizePack :: (CauterizeSerialize a) => a -> Either String B.ByteString
+cauterizePack a = case S.runPutM $ cautPut a of
+                    (Left e, _) -> Left e
+                    (Right _, v) -> Right v
+                    
+cauterizeUnpack :: (CauterizeSerialize a) => B.ByteString -> Maybe a
+cauterizeUnpack b = case S.runGet b $ cautGet of
+                      (Left e, _) -> Left e
+                      (Right _, v) -> Right v
 
 type U8 = Word8
 type U16 = Word16
@@ -84,3 +96,6 @@ instance CauterizeSize Ieee754d where
 
 instance CauterizeSize Bool where
   cautSize = justConst 1
+
+instance CauterizeSerialize U8 where
+  cautPut x = liftM Just (putWord8 x)

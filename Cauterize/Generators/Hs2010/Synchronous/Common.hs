@@ -12,6 +12,14 @@ module Cauterize.Generators.Hs2010.Synchronous.Common
   , spacedBraces
   , fieldDecl
   , asType
+  , ifStmt
+  , lkup
+
+  , unpackScalarAs
+  , constAsUndefined 
+  , builtinAsUndefined
+  , tyNameAsUndefined
+  , unpackArrayAs
   ) where
 
 import Cauterize.Specification
@@ -19,7 +27,9 @@ import Cauterize.Common.Types
 
 import qualified Data.Text.Lazy as T
 import qualified Data.Char as C
+import qualified Data.Map as M
 import Text.PrettyPrint.Leijen.Text
+import Data.Maybe
 
 hsFileName :: Spec -> FilePath
 hsFileName s = let part = nameToCapHsName $ T.pack $ specName s :: T.Text
@@ -66,6 +76,9 @@ biReprText BIieee754s = "Ieee754s"
 biReprText BIieee754d = "Ieee754d"
 biReprText BIbool = "Bool"
 
+ifStmt :: Doc -> Doc -> Doc -> Doc
+ifStmt cond t e = "if" <> align (vcat [" " <> cond, "then" <+> t, "else" <+> e])
+
 spacedBraces :: Doc -> Doc
 spacedBraces p = braces $ " " <> p <> " "
 
@@ -80,3 +93,26 @@ fieldDecl nameSpace (Field fn fr _) =
 
 asType :: Doc -> Doc -> Doc
 asType lhs rhs = lhs <+> "::" <+> rhs
+
+unpackScalarAs :: TScalar -> Doc -> Doc
+unpackScalarAs (TScalar n _) a = 
+  let tnd = sNameToTypeNameDoc n
+  in parens $ tnd <+> a
+
+constAsUndefined :: TConst -> Doc
+constAsUndefined (TConst _ b _) = builtinAsUndefined b
+
+builtinAsUndefined :: BuiltIn -> Doc
+builtinAsUndefined b = tyNameAsUndefined (biRepr b)
+
+tyNameAsUndefined :: Doc -> Doc
+tyNameAsUndefined n = parens $ "undefined" `asType` n
+
+unpackArrayAs :: TArray -> Doc -> Doc
+unpackArrayAs (TArray n _ _) a =
+  let tnd = sNameToTypeNameDoc n
+  in parens $ tnd <+> a
+  
+lkup :: Name -> M.Map Name SpType -> SpType
+lkup n m = let e = error $ "MISTAKE: Unable to lookup name " ++ n ++ " in spec type map."
+           in fromMaybe e $ n `M.lookup` m
