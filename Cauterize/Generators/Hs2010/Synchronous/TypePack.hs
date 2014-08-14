@@ -37,7 +37,7 @@ typePacker' _ (Struct (TStruct n (Fields fs)) _ _) =
       fputers = map (structFieldPuter objName $ sNameToVarNameDoc n) fs
   in putFn <+> objName <+> "=" <+> "do" <$> indent 2 (vcat fputers)
   
-typePacker' _ _ = putFn <+> "= undefined"
+typePacker' _ _ = empty
 
 structFieldPuter :: Doc -> Doc -> Field -> Doc
 structFieldPuter _ _ (EmptyField {}) = empty
