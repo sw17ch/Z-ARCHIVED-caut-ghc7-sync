@@ -32,27 +32,34 @@ typeSizer' _ (Const c _ _) = hsep [sizeFn, "_ =", sizeFn, constAsUndefined c]
 typeSizer' _ t@(Array (TArray _ _ l) _ s) =
   varSizeInsts s $ 
     "cautSize (" <> typeToTypeNameDoc t <> " v) = "
-     <> ifStmt (integer l <> " != V.length v")
+     <> ifStmt (integer l <> " /= V.length v")
                "Nothing"
                "liftM V.sum $ V.mapM cautSize v"
 typeSizer' _ t@(Vector (TVector _ _ l) _ s (LengthRepr r)) =
   varSizeInsts s $ 
     "cautSize (" <> typeToTypeNameDoc t <> " v) = "
-     <> ifStmt (integer l <> " < V.length v")
-               "Nothing"
-               "liftM (\\x -> cautSize" <+> builtinAsUndefined r <+> "+ V.sum x) $ V.mapM cautSize v"
+     <> ifStmt (integer l <> " < V.length v") "Nothing" e
+  where
+    e = "do" <+> align (vcat [ "lengthSize <- cautSize" <+> builtinAsUndefined r
+                             , "elemSize <- liftM V.sum $ V.mapM cautSize v"
+                             , "return $ lengthSize + elemSize"
+                             ])
 typeSizer' _ (Struct (TStruct n (Fields fs)) _ s) =
   let objName = "s"
-      fsizes = punctuate " + " $ map (structFieldSizer objName $ sNameToVarNameDoc n) fs
-  in varSizeInsts s $ "cautSize" <+> objName <+> "=" <+> align (sep fsizes)
+      fsizes = map (structFieldSizer objName $ sNameToVarNameDoc n) fs
+      doblk = "liftM sum $ sequence " <+> align (encloseSep "[ " (line <> "]") ", " fsizes)
+  in varSizeInsts s $ "cautSize" <+> objName <+> "=" <+> doblk
 typeSizer' _ (Set (TSet n (Fields fs)) _ s (FlagsRepr r)) =
   let objName = "s"
       repName = biRepr r
-      fsizes = punctuate " + " $ map (setFieldSizer objName $ sNameToVarNameDoc n) fs
+      fsizes = map (setFieldSizer objName $ sNameToVarNameDoc n) fs
   in varSizeInsts s $
-    "cautSize" <+> objName <+> "=" <+> align ("let repSize = cautSize (undefined :: " <> repName <> ")"
-                                          <$> "    fieldsSize = " <> align (sep fsizes)
-                                          <$> "in repSize + fieldsSize")
+    "cautSize" <+> objName <+> "=" <+>
+      "do" <+> align (vcat [ "flagsSize <- cautSize (undefined :: " <> repName <> ")"
+                           , "fieldsSize <- liftM sum $ sequence" <+>
+                              align (encloseSep "[ " (line <> "]") ", " fsizes)
+                           , "return $ flagsSize + fieldsSize"
+                           ])
 typeSizer' _ (Enum (TEnum n (Fields fs)) _ s (TagRepr r)) =
   let objName = "e"
       fieldVar = "e'"
@@ -62,12 +69,12 @@ typeSizer' _ (Enum (TEnum n (Fields fs)) _ s (TagRepr r)) =
                    in lhs <+> rhs
       fcases = map enumCase fs
       caseBlob = align $ "e of" <$> vcat fcases
-      lets = "let" <+> align ( "repSize = cautSize (undefined :: " <> repName <> ")"
-                           <$> "fieldsSize = case " <> caseBlob)
-      ins = "in repSize + fieldsSize"
-  in varSizeInsts s $ "cautSize" <+> objName <+> "=" <+> align (lets <$> ins)
+      e = "do" <+> align ( "repSize <- cautSize (undefined :: " <> repName <> ")"
+                       <$> "fieldsSize <- case " <> align caseBlob
+                       <$> "return $ repSize + fieldsSize")
+  in varSizeInsts s $ "cautSize" <+> objName <+> "=" <+> e
 typeSizer' _ (Pad (TPad _ l) _ _) =
-  vcat [ "cautSize _ = " <> integer l
+  vcat [ "cautSize _ = Just " <> integer l
        ] 
 
 enumFieldCaseMatch :: Doc -> Doc -> Field -> Doc
@@ -75,7 +82,7 @@ enumFieldCaseMatch _ nameSpace (EmptyField n _) = nameSpace <> sNameToTypeNameDo
 enumFieldCaseMatch var nameSpace (Field n _ _) = nameSpace <> sNameToTypeNameDoc n <+> var <+> "->"
 
 enumFieldSizer :: Doc -> Field -> Doc
-enumFieldSizer _ (EmptyField {}) = "0"
+enumFieldSizer _ (EmptyField {}) = "Just 0"
 enumFieldSizer fieldVar (Field {}) = "cautSize" <+> fieldVar
 
 structFieldSizer :: Doc -> Doc -> Field -> Doc
@@ -84,9 +91,9 @@ structFieldSizer objName nameSpace (Field n _ _) =
   "cautSize" <+> parens (nameSpace <> sNameToTypeNameDoc n <+> objName)
 
 setFieldSizer :: Doc -> Doc -> Field -> Doc
-setFieldSizer _ _ (EmptyField _ _) = "0"
+setFieldSizer _ _ (EmptyField _ _) = "Just 0"
 setFieldSizer objName nameSpace (Field n _ _) =
-  "maybe 0 cautSize" <+> parens (nameSpace <> sNameToTypeNameDoc n <+> objName)
+  "maybe (Just 0) cautSize" <+> parens (nameSpace <> sNameToTypeNameDoc n <+> objName)
 
 varSizeInsts :: Sized s => s -> Doc -> Doc
 varSizeInsts sizeSpec sizeCheck =

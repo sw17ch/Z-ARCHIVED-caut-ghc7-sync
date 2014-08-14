@@ -42,6 +42,8 @@ renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
                    , "import Cauterize.Support.Hs2010"
                    , "import Data.Bytes.Put"
                    , "import Data.Bytes.Get"
+                   , "import Control.Monad"
+                   , "import Control.Monad.Trans"
                    ]
 
     typeDecls = vcat $ map typeDecl ts

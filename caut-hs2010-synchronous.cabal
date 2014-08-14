@@ -15,6 +15,8 @@ build-type:          Simple
 extra-source-files:  README
 cabal-version:       >=1.10
 
+data-dir:            shared
+
 executable caut-hs2010-synchronous
   ghc-options:         -Wall -O2
   main-is:             main.hs

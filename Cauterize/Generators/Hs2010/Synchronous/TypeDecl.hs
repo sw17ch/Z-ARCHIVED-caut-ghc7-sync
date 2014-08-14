@@ -46,7 +46,7 @@ typeDecl t@(Pad {}) =
 
 arrDecl :: Doc -> Doc -> Doc -> Doc
 arrDecl tName elemName refName =
-  tName `dataDecl` tName <+> spacedBraces (elemName <+> ":: Vector" <+> refName)
+  tName `dataDecl` tName <+> spacedBraces (elemName <+> ":: V.Vector" <+> refName)
 
 dataDecl :: Doc -> Doc -> Doc
 dataDecl lhs rhs = "data" <+> lhs <+> "=" <+> rhs

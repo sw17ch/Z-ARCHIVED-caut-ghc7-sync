@@ -9,6 +9,8 @@ import System.FilePath.Posix
 
 import Data.Text.Lazy.IO as T
 
+import Paths_caut_hs2010_synchronous
+
 data CautHs2010Opts = CautHs2010Opts
   { inputFile :: String
   , outputDirectory :: String
@@ -54,11 +56,20 @@ cautHs2010 opts = do
         Left e -> print e
         Right s' -> render s' out
 
+createFullPath :: FilePath -> [FilePath] -> IO FilePath
+createFullPath p [] = return p
+createFullPath p (d:ds) = let n = p `combine` d
+                          in createDirectory n >> createFullPath n ds
+
 render :: Spec -> FilePath -> IO ()
 render spec path = do
   createDirectory path
   createDirectory root
+  supportPath <- createFullPath root ["Support"]
+
   T.writeFile (root `combine` hsFileName spec) hsFile
+  hs2010_dot_hs <- getDataFileName "Cauterize/Support/Hs2010.hs"
+  copyFile hs2010_dot_hs (supportPath `combine` "Hs2010.hs")
   where
     root = path `combine` "Cauterize"
     hsFile = renderHSFile spec
