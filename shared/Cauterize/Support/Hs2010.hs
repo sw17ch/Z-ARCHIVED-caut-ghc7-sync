@@ -4,6 +4,9 @@ module Cauterize.Support.Hs2010
   , CauterizeSerialize(..)
   , cauterizePack
   , cauterizeUnpack
+  
+  , putIfJust
+  , boolsToBits
 
   , U8
   , U16
@@ -21,6 +24,7 @@ module Cauterize.Support.Hs2010
 import Data.Word
 import Data.Int
 import Data.Maybe
+import Data.Bits
 -- import Data.Bytes.Put
 import Data.Bytes.Get
 import Data.Bytes.Serial
@@ -54,6 +58,17 @@ cauterizeUnpack b = let e = S.runGet cautGet b :: CauterizeSerialize a => Either
                           Right (Left l) -> Left l
                           Right (Right r) -> Right r
 
+putIfJust :: CauterizeSerialize a => Maybe a -> S.PutM (Either String ())
+putIfJust (Just v) = cautPut v
+putIfJust Nothing = return . Right $ ()
+
+boolsToBits :: (Num a, Bits a) => [Bool] -> a
+boolsToBits bools = go 0 $ zip bools [0..]
+  where
+    go a [] = a
+    go a ((bool, idx):bs) = let a' = if bool then a `setBit` idx else a
+                            in go a' bs
+
 type U8 = Word8
 type U16 = Word16
 type U32 = Word32
@@ -68,6 +83,9 @@ type Ieee754d = Double
 
 justConst :: a -> b -> Maybe a
 justConst a _ = Just a
+
+instance CauterizeSize () where
+  cautSize = justConst 0
 
 instance CauterizeSize U8 where
   cautSize = justConst 1

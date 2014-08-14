@@ -35,7 +35,7 @@ typeDecl t@(Set s _ _ _) =
       prefix = typeToVarNameDoc t
       sfs = unFields . setFields $ s 
   in tnd `dataDecl` tnd <+>
-    encloseSep "{ " (line <> "}") ", " (mapMaybe (setFieldDecl prefix) sfs)
+    encloseSep "{ " (line <> "}") ", " (map (setFieldDecl prefix) sfs)
 typeDecl t@(Enum e _ _ _) =
   let tnd = typeToTypeNameDoc t
       rhs = encloseSep " = " empty " | " $ map (enumFieldDecl tnd) (unFields . enumFields $ e)
@@ -62,12 +62,24 @@ structFieldDecl nameSpace (Field fn fr _) =
 
 -- TODO: Should we attempt to drop some annotation in the Haskell code that an
 -- empty field was left out?
-setFieldDecl :: Doc -> Field -> Maybe Doc
-setFieldDecl _ (EmptyField _ _) = Nothing
+setFieldDecl :: Doc -> Field -> Doc
+setFieldDecl nameSpace f =
+  case f of
+    (EmptyField {}) -> fn' `asType` "Maybe ()"
+    (Field _ fr _) -> let fr' = sNameToTypeNameDoc fr
+                      in fn' `asType` "Maybe" <+> fr'
+  where
+    fn' = nameSpace <> sNameToTypeNameDoc (fName f)
+    
+{-
+setFieldDecl nameSpace (EmptyField fn _) =
+  let fn' = nameSpace <> sNameToTypeNameDoc fn
+  in fn' `asType` "Maybe ()"
 setFieldDecl nameSpace (Field fn fr _) =
   let fn' = nameSpace <> sNameToTypeNameDoc fn
       fr' = sNameToTypeNameDoc fr
-  in Just $ fn' `asType` "Maybe" <+> fr'
+  in fn' `asType` "Maybe" <+> fr'
+  -}
 
 enumFieldDecl :: Doc -> Field -> Doc
 enumFieldDecl prefix (EmptyField fn _) = prefix <> sNameToTypeNameDoc fn

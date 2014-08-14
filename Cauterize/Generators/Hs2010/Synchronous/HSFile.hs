@@ -34,16 +34,10 @@ renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
 
     hsMod = "module Cauterize." <> (text . nameToCapHsName $ n) <+> "where"
 
-    imports = vcat [ "import Data.Maybe"
-                   , "import Data.Serialize"
-                   , "import Data.Word"
-                   , "import Data.Int"
-                   , "import qualified Data.Vector as V"
+    imports = vcat [ "import qualified Data.Vector as V"
                    , "import Cauterize.Support.Hs2010"
-                   , "import Data.Bytes.Put"
-                   , "import Data.Bytes.Get"
                    , "import Control.Monad"
-                   , "import Control.Monad.Trans"
+                   , "import Data.Maybe"
                    ]
 
     typeDecls = vcat $ map typeDecl ts

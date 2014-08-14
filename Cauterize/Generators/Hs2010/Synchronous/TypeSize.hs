@@ -91,9 +91,8 @@ structFieldSizer objName nameSpace (Field n _ _) =
   "cautSize" <+> parens (nameSpace <> sNameToTypeNameDoc n <+> objName)
 
 setFieldSizer :: Doc -> Doc -> Field -> Doc
-setFieldSizer _ _ (EmptyField _ _) = "Just 0"
-setFieldSizer objName nameSpace (Field n _ _) =
-  "maybe (Just 0) cautSize" <+> parens (nameSpace <> sNameToTypeNameDoc n <+> objName)
+setFieldSizer objName nameSpace f =
+  "maybe (Just 0) cautSize" <+> parens (nameSpace <> sNameToTypeNameDoc (fName f) <+> objName)
 
 varSizeInsts :: Sized s => s -> Doc -> Doc
 varSizeInsts sizeSpec sizeCheck =

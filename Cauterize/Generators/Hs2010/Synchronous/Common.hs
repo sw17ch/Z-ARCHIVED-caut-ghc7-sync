@@ -20,6 +20,7 @@ module Cauterize.Generators.Hs2010.Synchronous.Common
   , builtinAsUndefined
   , tyNameAsUndefined
   , unpackArrayAs
+  , unpackVectorAs
   ) where
 
 import Cauterize.Specification
@@ -110,6 +111,11 @@ tyNameAsUndefined n = parens $ "undefined" `asType` n
 
 unpackArrayAs :: TArray -> Doc -> Doc
 unpackArrayAs (TArray n _ _) a =
+  let tnd = sNameToTypeNameDoc n
+  in parens $ tnd <+> a
+
+unpackVectorAs :: TVector -> Doc -> Doc
+unpackVectorAs (TVector n _ _) a =
   let tnd = sNameToTypeNameDoc n
   in parens $ tnd <+> a
   
