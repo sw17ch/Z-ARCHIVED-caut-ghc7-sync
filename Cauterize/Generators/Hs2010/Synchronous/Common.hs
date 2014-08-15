@@ -16,7 +16,7 @@ module Cauterize.Generators.Hs2010.Synchronous.Common
   , lkup
 
   , unpackScalarAs
-  , constAsUndefined 
+  , constAsRepr 
   , builtinAsUndefined
   , tyNameAsUndefined
   , unpackArrayAs
@@ -100,8 +100,8 @@ unpackScalarAs (TScalar n _) a =
   let tnd = sNameToTypeNameDoc n
   in parens $ tnd <+> a
 
-constAsUndefined :: TConst -> Doc
-constAsUndefined (TConst _ b _) = builtinAsUndefined b
+constAsRepr :: TConst -> Doc
+constAsRepr (TConst _ b v) = parens (integer v `asType` biRepr b)
 
 builtinAsUndefined :: BuiltIn -> Doc
 builtinAsUndefined b = tyNameAsUndefined (biRepr b)

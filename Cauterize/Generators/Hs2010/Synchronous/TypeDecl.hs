@@ -12,35 +12,43 @@ import Data.Maybe
 
 typeDecl :: SpType -> Doc
 typeDecl (BuiltIn {}) = empty
-typeDecl t@(Scalar b _ _) =
+typeDecl t = td <$> indent 2 der <> line
+  where
+    td = typeDecl' t
+    ders = ["Show", "Eq", "Ord"]
+    der = "deriving" <+> parens (hcat $ punctuate ", " ders)
+
+typeDecl' :: SpType -> Doc
+typeDecl' (BuiltIn {}) = error "Should never reach this."
+typeDecl' t@(Scalar b _ _) =
   let tnd = typeToTypeNameDoc t
   in "newtype" <+> tnd <+> "=" <+> tnd <+> spacedBraces ("un" <> tnd <+> "::" <+> biRepr (scalarRepr b))
-typeDecl t@(Const {}) =
+typeDecl' t@(Const {}) =
   let tnd = typeToTypeNameDoc t
   in tnd `dataDecl` tnd
-typeDecl t@(Array (TArray _ r _) _ _) =
+typeDecl' t@(Array (TArray _ r _) _ _) =
   let elemName = (sNameToVarNameDoc . typeName) t <> "Elements"
   in arrDecl (typeToTypeNameDoc t) elemName (sNameToTypeNameDoc r)
-typeDecl t@(Vector (TVector _ r _) _ _ _) =
+typeDecl' t@(Vector (TVector _ r _) _ _ _) =
   let elemName = (sNameToVarNameDoc . typeName) t <> "Elements"
   in arrDecl (typeToTypeNameDoc t) elemName (sNameToTypeNameDoc r)
-typeDecl t@(Struct s _ _) =
+typeDecl' t@(Struct s _ _) =
   let tnd = typeToTypeNameDoc t
       prefix = typeToVarNameDoc t
       sfs = unFields . structFields $ s 
   in tnd `dataDecl` tnd <+>
     encloseSep "{ " (line <> "}") ", " (mapMaybe (structFieldDecl prefix) sfs)
-typeDecl t@(Set s _ _ _) =
+typeDecl' t@(Set s _ _ _) =
   let tnd = typeToTypeNameDoc t
       prefix = typeToVarNameDoc t
       sfs = unFields . setFields $ s 
   in tnd `dataDecl` tnd <+>
     encloseSep "{ " (line <> "}") ", " (map (setFieldDecl prefix) sfs)
-typeDecl t@(Enum e _ _ _) =
+typeDecl' t@(Enum e _ _ _) =
   let tnd = typeToTypeNameDoc t
       rhs = encloseSep " = " empty " | " $ map (enumFieldDecl tnd) (unFields . enumFields $ e)
   in "data" <+> tnd <> rhs
-typeDecl t@(Pad {}) =
+typeDecl' t@(Pad {}) =
   let tnd = typeToTypeNameDoc t
   in "data" <+> tnd <+> "=" <+> tnd
 
@@ -71,16 +79,6 @@ setFieldDecl nameSpace f =
   where
     fn' = nameSpace <> sNameToTypeNameDoc (fName f)
     
-{-
-setFieldDecl nameSpace (EmptyField fn _) =
-  let fn' = nameSpace <> sNameToTypeNameDoc fn
-  in fn' `asType` "Maybe ()"
-setFieldDecl nameSpace (Field fn fr _) =
-  let fn' = nameSpace <> sNameToTypeNameDoc fn
-      fr' = sNameToTypeNameDoc fr
-  in fn' `asType` "Maybe" <+> fr'
-  -}
-
 enumFieldDecl :: Doc -> Field -> Doc
 enumFieldDecl prefix (EmptyField fn _) = prefix <> sNameToTypeNameDoc fn
 enumFieldDecl prefix (Field fn fr _) = prefix <> sNameToTypeNameDoc fn <+> sNameToTypeNameDoc fr

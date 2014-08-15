@@ -28,7 +28,7 @@ typeSizer m t = let n = typeName t
 typeSizer' :: M.Map Name SpType -> SpType -> Doc
 typeSizer' _ (BuiltIn {}) = error "Should never reach this."
 typeSizer' _ (Scalar s _ _) = hsep [sizeFn, unpackScalarAs s "x", "=", sizeFn, "x"]
-typeSizer' _ (Const c _ _) = hsep [sizeFn, "_ =", sizeFn, constAsUndefined c]
+typeSizer' _ (Const c _ _) = hsep [sizeFn, "_ =", sizeFn, constAsRepr c]
 typeSizer' _ t@(Array (TArray _ _ l) _ s) =
   varSizeInsts s $ 
     "cautSize (" <> typeToTypeNameDoc t <> " v) = "

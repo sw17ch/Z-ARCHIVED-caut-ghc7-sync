@@ -32,7 +32,8 @@ import qualified Data.ByteString as B
 import qualified Data.Serialize.Put as S
 import qualified Data.Serialize.Get as S
 
-import Control.Monad
+import Control.Monad.Trans
+import Control.Monad.Trans.Except
 
 class CauterizeSize a where
   cautSize :: a -> Maybe Integer
@@ -43,24 +44,24 @@ class CauterizeSize a where
   maxSize = fromJust . cautSize
 
 class CauterizeSerialize a where
-  cautPut :: a -> S.PutM (Either String ())
-  cautGet :: S.Get (Either String a)
+  cautPut :: a -> ExceptT String S.PutM ()
+  cautGet :: ExceptT String S.Get a
 
 cauterizePack :: (CauterizeSerialize a) => a -> Either String B.ByteString
-cauterizePack a = case S.runPutM $ cautPut a of
+cauterizePack a = case S.runPutM . runExceptT $ cautPut a of
                     (Left e, _) -> Left e
                     (Right _, v) -> Right v
                     
 cauterizeUnpack :: (CauterizeSerialize a) => B.ByteString -> Either String a
-cauterizeUnpack b = let e = S.runGet cautGet b :: CauterizeSerialize a => Either String (Either String a)
-                    in case e of
+cauterizeUnpack b = let a = runExceptT cautGet
+                    in case S.runGet a b of
                           Left l -> Left l
                           Right (Left l) -> Left l
                           Right (Right r) -> Right r
 
-putIfJust :: CauterizeSerialize a => Maybe a -> S.PutM (Either String ())
+putIfJust :: CauterizeSerialize a => Maybe a -> ExceptT String S.PutM ()
 putIfJust (Just v) = cautPut v
-putIfJust Nothing = return . Right $ ()
+putIfJust Nothing = lift $ return ()
 
 boolsToBits :: (Num a, Bits a) => [Bool] -> a
 boolsToBits bools = go 0 $ zip bools [0..]
@@ -120,15 +121,15 @@ instance CauterizeSize Ieee754d where
 instance CauterizeSize Bool where
   cautSize = justConst 1
 
-cput :: SerialEndian a => a -> S.PutM (Either String ())
-cput x = liftM Right (serializeLE x)
+cput :: SerialEndian a => a -> ExceptT String S.PutM ()
+cput x = lift $ serializeLE x
 
-cget :: SerialEndian a => S.Get (Either String a)
-cget = liftM Right deserializeLE
+cget :: SerialEndian a => ExceptT String S.Get a
+cget = lift deserializeLE
 
 instance CauterizeSerialize U8 where
-  cautPut x = liftM Right $ serialize x
-  cautGet = liftM Right deserialize
+  cautPut x = lift $ serialize x
+  cautGet = lift deserialize
 
 instance CauterizeSerialize U16 where
   cautPut = cput
@@ -143,8 +144,8 @@ instance CauterizeSerialize U64 where
   cautGet = cget
 
 instance CauterizeSerialize S8 where
-  cautPut x = liftM Right $ serialize x
-  cautGet = liftM Right deserialize
+  cautPut x = lift $ serialize x
+  cautGet = lift deserialize
 
 instance CauterizeSerialize S16 where
   cautPut = cput
@@ -167,10 +168,10 @@ instance CauterizeSerialize Ieee754d where
   cautGet = cget
 
 instance CauterizeSerialize Bool where
-  cautPut x = liftM Right $ serialize ((fromIntegral . fromEnum) x :: Word8)
+  cautPut x = lift $ serialize ((fromIntegral . fromEnum) x :: Word8)
   cautGet = do
     w <- deserialize :: MonadGet m => m Word8
     case w of
-      0 -> return (Right False)
-      1 -> return (Right True)
-      _ -> return (Left $ "Invalid enumeration value: " ++ show w)
+      0 -> lift $ return False
+      1 -> lift $ return True
+      _ -> throwE $ "Invalid enumeration value: " ++ show w
