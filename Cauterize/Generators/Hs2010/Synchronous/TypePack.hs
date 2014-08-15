@@ -77,6 +77,9 @@ typeUnpacker' _ (Const (TConst _ r v ) _ _) =
                                       , indent 2 $ "else throwE $ \"Invalid constant value. Expected" <+> integer v <> ". Got: \" ++ show v"
 
                                       ])
+typeUnpacker' _ (Array (TArray n _ l) _ _) =
+  let n' = sNameToTypeNameDoc n
+  in getFn <+> "= liftM" <+> n' <+> "$ V.sequence" <+> parens ("V.fromList $ replicate" <+> integer l <+> "cautGet")
 typeUnpacker' _ t@(Enum (TEnum _ (Fields fs)) _ _ (TagRepr tr)) =
   let tnd = typeToTypeNameDoc t
   in getFn <+> " = do" <+> (align $ vcat [ "tag <- cautGet" `asType` "ExceptT String S.Get" <+> biRepr tr
