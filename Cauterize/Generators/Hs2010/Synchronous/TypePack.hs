@@ -34,7 +34,7 @@ typePacker' _ (Const c _ _) = hsep [putFn, "_ =", putFn, constAsRepr c]
 typePacker' _ (Array a _ _) =
   let n = "x"
       l = arrayLen a
-      rest = ifStmt (integer l <+> "== V.length" <+> n)
+      rest = ifStmt (integer l <+> "/= V.length" <+> n)
                     ("throwE \"Invalid Vector length for" <+> (sNameToTypeNameDoc . arrayName) a <+> ".\"")
                     ("V.mapM_" <+> putFn <+> n)
   in hsep [putFn, unpackArrayAs a n, "=", rest]
@@ -120,15 +120,6 @@ typeUnpacker' _ (Pad (TPad n ln) _ _) =
 
 unpackArrayOfLen :: Doc -> Doc -> Doc
 unpackArrayOfLen len constructor = "liftM" <+> constructor <+> "$ V.sequence" <+> parens ("V.fromList $ replicate" <+> len <+> "cautGet")
-
-manyNames :: [Doc]
-manyNames = map (\i -> (text $ T.pack $ 'f':show i)) ([0..] :: [Integer])
-
-nameFields :: [Field] -> [Doc]
-nameFields fs = mapMaybe go (zip fs manyNames)
-  where
-    go (EmptyField {}, _) = Nothing
-    go (Field {}, n) = Just n
 
 structFieldPuter :: Doc -> Doc -> Field -> Doc
 structFieldPuter _ _ (EmptyField {}) = empty

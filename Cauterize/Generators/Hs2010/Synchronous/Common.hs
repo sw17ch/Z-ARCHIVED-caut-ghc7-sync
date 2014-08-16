@@ -14,6 +14,8 @@ module Cauterize.Generators.Hs2010.Synchronous.Common
   , asType
   , ifStmt
   , lkup
+  , manyNames
+  , nameFields
 
   , unpackScalarAs
   , constAsRepr 
@@ -122,3 +124,12 @@ unpackVectorAs (TVector n _ _) a =
 lkup :: Name -> M.Map Name SpType -> SpType
 lkup n m = let e = error $ "MISTAKE: Unable to lookup name " ++ n ++ " in spec type map."
            in fromMaybe e $ n `M.lookup` m
+
+manyNames :: [Doc]
+manyNames = map (\i -> (text $ T.pack $ 'f':show i)) ([0..] :: [Integer])
+
+nameFields :: [Field] -> [Doc]
+nameFields fs = mapMaybe go (zip fs manyNames)
+  where
+    go (EmptyField {}, _) = Nothing
+    go (Field {}, n) = Just n
