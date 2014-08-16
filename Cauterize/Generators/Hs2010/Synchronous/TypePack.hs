@@ -8,7 +8,9 @@ import Cauterize.Common.Types
 import Cauterize.Generators.Hs2010.Synchronous.Common
 
 import Text.PrettyPrint.Leijen.Text
+import qualified Data.Text.Lazy as T
 import qualified Data.Map as M
+import Data.Maybe
 
 putFn :: Doc
 putFn = "cautPut"
@@ -79,19 +81,61 @@ typeUnpacker' _ (Const (TConst _ r v ) _ _) =
                                       ])
 typeUnpacker' _ (Array (TArray n _ l) _ _) =
   let n' = sNameToTypeNameDoc n
-  in getFn <+> "= liftM" <+> n' <+> "$ V.sequence" <+> parens ("V.fromList $ replicate" <+> integer l <+> "cautGet")
+  in getFn <+> "=" <+> unpackArrayOfLen (integer l) n'
+typeUnpacker' _ (Vector (TVector n _ l) _ _ (LengthRepr lr)) =
+  let n' = sNameToTypeNameDoc n
+  in getFn <+> "= do" <+> (align $ vcat [ "len <-" <+> getFn `asType` ("ExceptT String S.Get" <+> biRepr lr)
+                                        , "if len >" <+> integer l
+                                        , "  then throwE $ \"Invalid length unpacked: \" ++ show len"
+                                        , "  else" <+> unpackArrayOfLen "(fromIntegral len)" n'
+                                        ])
+typeUnpacker' _ (Struct (TStruct n (Fields fs)) _ _) =
+  let fNames = nameFields fs
+      n' = sNameToTypeNameDoc n
+  in getFn <+> "= do" <+> align ( vcat (map structFieldGetter fNames)
+                              <$> "return" <+> parens (n' <+> hsep fNames)
+                                )
+typeUnpacker' _ (Set (TSet n (Fields fs)) _ _ (FlagsRepr fr)) =
+  let fNames = take (length fs) manyNames
+      n' = sNameToTypeNameDoc n
+  in getFn <+> "= do" <+> align ( "flags <- cautGet :: ExceptT String S.Get" <+> biRepr fr
+                              <$> "if zeroBits /=" <+> parens ("Bits.complement" <+> int (((2 :: Int) ^ (length fs)) - 1) <+> ".&. flags")
+                              <$> "  then throwE $ \"Flags out of range. Flags were: \" ++ show flags"
+                              <$> "  else do" <+> ( align ( vcat (map setFieldGetter (zip fs fNames))
+                                                        <$> "return" <+> parens (n' <+> hsep fNames))))
 typeUnpacker' _ t@(Enum (TEnum _ (Fields fs)) _ _ (TagRepr tr)) =
   let tnd = typeToTypeNameDoc t
   in getFn <+> " = do" <+> (align $ vcat [ "tag <- cautGet" `asType` "ExceptT String S.Get" <+> biRepr tr
                             , "case tag of"
                             ] <$> (indent 2 $ (vcat $ map (enumFieldUnpacker tnd) fs)
                                           <$> "_ -> throwE $ \"Invalid tag: \" ++ show tag"))
+typeUnpacker' _ (Pad (TPad n ln) _ _) =
+  let n' = sNameToTypeNameDoc n
+  in getFn <+> "="
+     <+> "do" <+> align (vcat [ "bsPad <- lift $ S.getBytes" <+> integer ln
+                              , "if all (== 0) (B.unpack bsPad)"
+                              , "  then return" <+> n'
+                              , "  else throwE \"The " <+> integer ln <+> "padding bytes were not all NULL.\""
+                              ])
 
-typeUnpacker' _ _ = empty
+unpackArrayOfLen :: Doc -> Doc -> Doc
+unpackArrayOfLen len constructor = "liftM" <+> constructor <+> "$ V.sequence" <+> parens ("V.fromList $ replicate" <+> len <+> "cautGet")
+
+manyNames :: [Doc]
+manyNames = map (\i -> (text $ T.pack $ 'f':show i)) ([0..] :: [Integer])
+
+nameFields :: [Field] -> [Doc]
+nameFields fs = mapMaybe go (zip fs manyNames)
+  where
+    go (EmptyField {}, _) = Nothing
+    go (Field {}, n) = Just n
 
 structFieldPuter :: Doc -> Doc -> Field -> Doc
 structFieldPuter _ _ (EmptyField {}) = empty
 structFieldPuter objName nameSpace (Field n _ _) = putFn <+> parens (nameSpace <> sNameToTypeNameDoc n <+> objName)
+
+structFieldGetter :: Doc -> Doc
+structFieldGetter n = n <+> "<- cautGet"
 
 setFieldPuter :: Doc -> Doc -> Field -> Doc
 setFieldPuter _ _ (EmptyField {}) = empty
@@ -100,6 +144,16 @@ setFieldPuter objName nameSpace (Field n _ _) = "putIfJust" <+> parens (nameSpac
 setFieldFlager :: Doc -> Doc -> Field -> Doc
 setFieldFlager objName nameSpace f = let n = fName f
                                      in "isJust" <+> parens (nameSpace <> sNameToTypeNameDoc n <+> objName)
+
+setFieldGetter :: (Field, Doc) -> Doc
+setFieldGetter (f, d) = hsep [d, "<- if", check, "then", ifThen, "else", ifElse]
+  where
+    i = fIndex f
+    check = "flags `testBit`" <+> integer i
+    ifThen = case f of
+              EmptyField {} -> "return (Just ())"
+              Field {} -> "cautGet >>= return . Just"
+    ifElse = "return Nothing"
 
 enumFieldPacker :: Doc -> Doc -> BuiltIn -> Field -> Doc
 enumFieldPacker func prefix tr f =

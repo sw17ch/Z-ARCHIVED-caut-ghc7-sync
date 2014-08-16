@@ -85,8 +85,8 @@ type Ieee754d = Double
 justConst :: a -> b -> Maybe a
 justConst a _ = Just a
 
-instance CauterizeSize () where
-  cautSize = justConst 0
+-- instance CauterizeSize () where
+--   cautSize = justConst 0
 
 instance CauterizeSize U8 where
   cautSize = justConst 1

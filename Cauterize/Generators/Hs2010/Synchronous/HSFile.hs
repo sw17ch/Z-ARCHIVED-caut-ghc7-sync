@@ -43,6 +43,7 @@ renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
                    , "import qualified Data.Serialize.Get as S"
                    , "import qualified Data.Serialize.Put as P"
                    , "import qualified Data.ByteString as B"
+                   , "import Data.Bits as Bits"
                    ]
 
     typeDecls = vcat $ map typeDecl ts

@@ -9,6 +9,7 @@ import Cauterize.Generators.Hs2010.Synchronous.Common
 
 import Text.PrettyPrint.Leijen.Text
 import qualified Data.Map as M
+import Data.Maybe
 
 sizeFn :: Doc
 sizeFn = "cautSize"
@@ -46,13 +47,13 @@ typeSizer' _ t@(Vector (TVector _ _ l) _ s (LengthRepr r)) =
                              ])
 typeSizer' _ (Struct (TStruct n (Fields fs)) _ s) =
   let objName = "s"
-      fsizes = map (structFieldSizer objName $ sNameToVarNameDoc n) fs
+      fsizes = mapMaybe (structFieldSizer objName $ sNameToVarNameDoc n) fs
       doblk = "liftM sum $ sequence " <+> align (encloseSep "[ " (line <> "]") ", " fsizes)
   in varSizeInsts s $ "cautSize" <+> objName <+> "=" <+> doblk
 typeSizer' _ (Set (TSet n (Fields fs)) _ s (FlagsRepr r)) =
   let objName = "s"
       repName = biRepr r
-      fsizes = map (setFieldSizer objName $ sNameToVarNameDoc n) fs
+      fsizes = mapMaybe (setFieldSizer objName $ sNameToVarNameDoc n) fs
   in varSizeInsts s $
     "cautSize" <+> objName <+> "=" <+>
       "do" <+> align (vcat [ "flagsSize <- cautSize (undefined :: " <> repName <> ")"
@@ -85,13 +86,14 @@ enumFieldSizer :: Doc -> Field -> Doc
 enumFieldSizer _ (EmptyField {}) = "Just 0"
 enumFieldSizer fieldVar (Field {}) = "cautSize" <+> fieldVar
 
-structFieldSizer :: Doc -> Doc -> Field -> Doc
-structFieldSizer _ _ (EmptyField _ _) = "0"
-structFieldSizer objName nameSpace (Field n _ _) =
+structFieldSizer :: Doc -> Doc -> Field -> Maybe Doc
+structFieldSizer _ _ (EmptyField _ _) = Nothing
+structFieldSizer objName nameSpace (Field n _ _) = Just $
   "cautSize" <+> parens (nameSpace <> sNameToTypeNameDoc n <+> objName)
 
-setFieldSizer :: Doc -> Doc -> Field -> Doc
-setFieldSizer objName nameSpace f =
+setFieldSizer :: Doc -> Doc -> Field -> Maybe Doc
+setFieldSizer _ _ (EmptyField _ _) = Nothing
+setFieldSizer objName nameSpace f = Just $
   "maybe (Just 0) cautSize" <+> parens (nameSpace <> sNameToTypeNameDoc (fName f) <+> objName)
 
 varSizeInsts :: Sized s => s -> Doc -> Doc
