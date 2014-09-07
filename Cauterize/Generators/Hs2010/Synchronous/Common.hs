@@ -103,6 +103,7 @@ unpackScalarAs (TScalar n _) a =
   in parens $ tnd <+> a
 
 constAsRepr :: TConst -> Doc
+constAsRepr (TConst _ BIbool v) = parens (integer v `asType` biRepr BIu8)
 constAsRepr (TConst _ b v) = parens (integer v `asType` biRepr b)
 
 builtinAsUndefined :: BuiltIn -> Doc

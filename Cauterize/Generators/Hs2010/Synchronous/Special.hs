@@ -52,7 +52,7 @@ arbInst' t@(Set (TSet _ (Fields fs)) _ _ _) =
   in arbFn <+> "= do" <+> (align $ (vcat arbs) <$> ("return" <+> parens (tnd <+> hsep arbNs)))
 arbInst' t@(Enum (TEnum _ (Fields fs)) _ _ _) =
   let arbFieldFns = map (arbEnumField $ typeToTypeNameDoc t) fs
-  in arbFn <+> "= QC.oneof" <+> encloseSep "[ " (line <> "]") ", " arbFieldFns
+  in arbFn <+> "= QC.oneof" <+> encloseSep "[ " " ]" ", " arbFieldFns
   
 arbInst' t@(Pad {}) =
   let tnd = typeToTypeNameDoc t

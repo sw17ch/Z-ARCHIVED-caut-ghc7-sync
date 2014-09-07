@@ -53,7 +53,7 @@ typePacker' _ (Struct (TStruct n (Fields fs)) _ _) =
   in putFn <+> objName <+> "=" <+> "do" <$> indent 2 (vcat fputers)
 typePacker' _ (Set (TSet n (Fields fs)) _ _ (FlagsRepr r)) =
   let objName = "s"
-      flagExps = encloseSep "[ " (line <> "]") ", " $ map (setFieldFlager objName $ sNameToVarNameDoc n) fs
+      flagExps = encloseSep "[ " " ]" ", " $ map (setFieldFlager objName $ sNameToVarNameDoc n) fs
       lete = "let flags = boolsToBits" <+> flagExps <+> "::" <+> biRepr r
       fputers = putFn <+> "flags" : map (setFieldPuter objName $ sNameToVarNameDoc n) fs
       ine = "in do" <+> align (vcat fputers)
@@ -71,11 +71,13 @@ typeUnpacker' _ (BuiltIn {}) = error "Should never reach this."
 typeUnpacker' _ (Scalar (TScalar n _) _ _) =
   let n' = sNameToTypeNameDoc n
   in hsep [getFn, "=", "liftM", n', "cautGet"]
-typeUnpacker' _ (Const (TConst _ r v ) _ _) =
-  let r' = biRepr r
+typeUnpacker' _ (Const (TConst n r v ) _ _) =
+  let r' = case r of
+            BIbool -> biRepr BIu8
+            _ -> biRepr r
   in getFn <+> "= do" <+> align (vcat [ "v <- cautGet :: ExceptT String S.Get" <+> r'
                                       , "if" <+> integer v <+> "== v"
-                                      , indent 2 "then return Smallconst"
+                                      , indent 2 "then return " <+> sNameToTypeNameDoc n
                                       , indent 2 $ "else throwE $ \"Invalid constant value. Expected" <+> integer v <> ". Got: \" ++ show v"
 
                                       ])
