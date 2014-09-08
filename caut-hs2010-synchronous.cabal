@@ -36,3 +36,23 @@ executable caut-hs2010-synchronous
                        cauterize-core <=0.1.0.0
   -- hs-source-dirs:      
   default-language:    Haskell2010
+
+library
+  build-depends:       base >=4.6 && <4.8,
+                       split,
+                       directory,
+                       filepath,
+                       wl-pprint-text,
+                       text,
+                       containers,
+                       bytes,
+                       cereal,
+                       bytestring,
+                       cauterize-core <=0.1.0.0
+  default-language:    Haskell2010
+  exposed-modules: Cauterize.Generators.Hs2010.Synchronous.Common,
+                   Cauterize.Generators.Hs2010.Synchronous.HSFile,
+                   Cauterize.Generators.Hs2010.Synchronous.Special,
+                   Cauterize.Generators.Hs2010.Synchronous.TypeDecl,
+                   Cauterize.Generators.Hs2010.Synchronous.TypePack,
+                   Cauterize.Generators.Hs2010.Synchronous.TypeSize
