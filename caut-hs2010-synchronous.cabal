@@ -16,6 +16,7 @@ extra-source-files:  README
 cabal-version:       >=1.10
 
 data-dir:            shared
+data-files:          Cauterize/Support/Hs2010.hs
 
 executable caut-hs2010-synchronous
   ghc-options:         -Wall -O2
