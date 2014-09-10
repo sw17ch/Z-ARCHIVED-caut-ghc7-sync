@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Cauterize.Generators.Hs2010.Synchronous.HSFile
   ( hsFileName
+  , libName
   , renderHSFile
   ) where
 

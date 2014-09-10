@@ -65,11 +65,23 @@ render :: Spec -> FilePath -> IO ()
 render spec path = do
   createDirectory path
   createDirectory root
-  supportPath <- createFullPath root ["Support"]
+
+  setup_hs <- getDataFileName "Setup.hs"
+  license <- getDataFileName "lib_LICENSE"
+
+  cabalFileData <- cabalFile
 
   T.writeFile (root `combine` hsFileName spec) hsFile
-  hs2010_dot_hs <- getDataFileName "Cauterize/Support/Hs2010.hs"
-  copyFile hs2010_dot_hs (supportPath `combine` "Hs2010.hs")
+  Prelude.writeFile (path `combine` cabalFileName) cabalFileData
+  copyFile setup_hs (path `combine` "Setup.hs")
+  copyFile license (path `combine` "LICENSE")
+
   where
     root = path `combine` "Cauterize"
     hsFile = renderHSFile spec
+    cabalFileName = "caut-generated-" ++ libName spec ++ ".cabal"
+    cabalFile = do
+      setup_hs <- getDataFileName "lib.cabal"
+      c <- Prelude.readFile setup_hs
+      let nameLine = "name:                caut-generated-" ++ libName spec ++ "\n"
+      return $ nameLine ++ c

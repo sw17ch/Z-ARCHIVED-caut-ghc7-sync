@@ -5,6 +5,7 @@ module Cauterize.Generators.Hs2010.Synchronous.Common
   , typeToTypeNameDoc
   , typeToVarNameDoc
   , hsFileName
+  , libName
   , biRepr
   , biReprText
   , nameToCapHsName
@@ -33,6 +34,9 @@ import qualified Data.Char as C
 import qualified Data.Map as M
 import Text.PrettyPrint.Leijen.Text
 import Data.Maybe
+
+libName :: Spec -> String
+libName s = specName s
 
 hsFileName :: Spec -> FilePath
 hsFileName s = let part = nameToCapHsName $ T.pack $ specName s :: T.Text

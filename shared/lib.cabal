@@ -1,0 +1,16 @@
+version:             0.1.0.0
+license-file:        LICENSE
+author:              Undefined
+maintainer:          undefined@undefined.undefined
+category:            Data
+build-type:          Simple
+extra-source-files:  README
+cabal-version:       >=1.10
+
+library
+  ghc-options:         -Wall
+  build-depends:       base >=4.6 && <4.8,
+                       bytes,
+                       bytestring,
+                       caut-hs2010-synchronous-support >= 0.1
+  default-language:    Haskell2010
