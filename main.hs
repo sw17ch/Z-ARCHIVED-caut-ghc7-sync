@@ -10,7 +10,6 @@ import System.Directory
 import System.FilePath.Posix
 
 import Data.Text.Lazy.IO as T
-import Data.Maybe
 
 import Paths_caut_hs2010_synchronous
 
