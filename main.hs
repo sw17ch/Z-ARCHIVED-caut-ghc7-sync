@@ -1,6 +1,7 @@
 module Main where
 
 import Cauterize.Specification
+import qualified Cauterize.AI as AI
 import Cauterize.Generators.Hs2010.Synchronous.HSFile
 import Cauterize.Generators.Hs2010.Synchronous.HSAiFile
 
@@ -9,6 +10,7 @@ import System.Directory
 import System.FilePath.Posix
 
 import Data.Text.Lazy.IO as T
+import Data.Maybe
 
 import Paths_caut_hs2010_synchronous
 
@@ -62,15 +64,21 @@ cautHs2010 opts = do
       s <- parseFile inFile
       case s of
         Left e -> print e
-        Right s' -> render s' out
+        Right s' -> case aiInputFile opts of
+                      Nothing -> render s' Nothing out
+                      Just aif -> do
+                        aif' <- AI.parseFile aif
+                        case aif' of
+                          Left e -> print e
+                          Right ai -> render s' (Just ai) out
 
 createFullPath :: FilePath -> [FilePath] -> IO FilePath
 createFullPath p [] = return p
 createFullPath p (d:ds) = let n = p `combine` d
                           in createDirectory n >> createFullPath n ds
 
-render :: Spec -> FilePath -> IO ()
-render spec path = do
+render :: Spec -> Maybe AI.Ai -> FilePath -> IO ()
+render spec mai path = do
   createDirectory path
   createDirectory root
 
@@ -80,7 +88,11 @@ render spec path = do
   cabalFileData <- cabalFile
 
   T.writeFile (root `combine` hsFileName spec) hsFile
-  T.writeFile (root `combine` hsAiFileName spec) hsAiFile
+
+  case mai of
+    Just ai -> T.writeFile (root `combine` hsAiFileName spec) (hsAiFile ai)
+    Nothing -> return ()
+
   Prelude.writeFile (path `combine` cabalFileName) cabalFileData
   copyFile setup_hs (path `combine` "Setup.hs")
   copyFile license (path `combine` "LICENSE")

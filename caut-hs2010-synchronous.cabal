@@ -36,6 +36,7 @@ executable caut-hs2010-synchronous
                        bytes,
                        cereal,
                        bytestring,
+                       cauterize-ai <=0.1.0.0,
                        cauterize-core <=0.1.0.0
   -- hs-source-dirs:      
   default-language:    Haskell2010
@@ -52,6 +53,7 @@ library
                        bytes,
                        cereal,
                        bytestring,
+                       cauterize-ai <=0.1.0.0,
                        cauterize-core <=0.1.0.0
   default-language:    Haskell2010
   exposed-modules: Cauterize.Generators.Hs2010.Synchronous.Common,
