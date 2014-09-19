@@ -57,11 +57,23 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
 
     typeSerialize = let d = "aiPack" <> aiTypeName
                         t = d <+> "::" <+> aiTypeName <+> "-> B.ByteString"
-                        i = d <+> "t" <+> "=" <+> "undefined"
-                    in t <$> i <$> (indent 2 "where")
-
-    typeGet = "cautGet = ???"
-    typePut = "cautPut t = case t of" <$> indent 14 putters
+                        mk (AI.AiType ain _) =
+                          let ain' = (text . nameToCapHsName . T.pack) ain
+                          in d <+> parens ("Msg" <> ain' <+> "t") <+> "=" <+> (mkBody ain')
+                        is = vcat $ map mk ts
+                        mkBody ain =
+                          align $ vcat ["let" <+>
+                                          (align $ vcat [ "tbs = cauterizePack t"
+                                                        , "tagbs = B.pack tag" <> ain
+                                                        , "lbs = lenAsBs ((B.length tbs) + (B.length tagbs))"
+                                                        ])
+                                       ,"in lbs `B.append` tagbs `B.append` tbs"
+                                       ]
+                    in t <$> is <$> (indent 2 "where") <$> (indent 4 $ "lenAsBs l = let l' = fromIntegral (bytesRequired (fromIntegral l)) ::" <+> byteCountToWordDoc (AI.aiDataLength ai))
+                                                                               <+> "in cauterizePack l'"
+                                                                                                       
+    typeGet = "cautGet = ???"                                                                          
+    typePut = "cautPut t = case t of" <$> indent 14 putters                                            
 
     putters = vcat $ map mkPutter ts
 
@@ -95,3 +107,10 @@ mkAltMinSize t = msgName t <+> "t -> minSize t"
 
 mkAltMaxSize :: AI.AiType -> Doc
 mkAltMaxSize t = msgName t <+> "t -> maxSize t"
+
+byteCountToWordDoc :: Integer -> Doc
+byteCountToWordDoc c | c == 1 = "U8"
+                     | c == 2 = "U16"
+                     | c == 4 = "U32"
+                     | c == 8 = "U64"
+                     | otherwise = error $ "Unable to represent " ++ show c ++ " as a unsigned word."
