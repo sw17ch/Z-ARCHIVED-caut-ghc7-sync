@@ -2,6 +2,7 @@ module Main where
 
 import Cauterize.Specification
 import Cauterize.Generators.Hs2010.Synchronous.HSFile
+import Cauterize.Generators.Hs2010.Synchronous.HSAiFile
 
 import Options.Applicative
 import System.Directory
@@ -13,6 +14,7 @@ import Paths_caut_hs2010_synchronous
 
 data CautHs2010Opts = CautHs2010Opts
   { inputFile :: String
+  , aiInputFile :: Maybe String
   , outputDirectory :: String
   } deriving (Show)
 
@@ -22,6 +24,12 @@ optParser = CautHs2010Opts
     ( long "input"
    <> metavar "FILE_PATH"
    <> help "Input Cauterize specification file."
+    )
+  <*> (\m -> nullOption $ reader (\v -> return $ Just v) `mappend` m)
+    ( long "ai-input"
+   <> metavar "AI_FILE_PATH"
+   <> value Nothing
+   <> help "Input Agnostic Interface specification file."
     )
   <*> strOption
     ( long "output"
@@ -72,6 +80,7 @@ render spec path = do
   cabalFileData <- cabalFile
 
   T.writeFile (root `combine` hsFileName spec) hsFile
+  T.writeFile (root `combine` hsAiFileName spec) hsAiFile
   Prelude.writeFile (path `combine` cabalFileName) cabalFileData
   copyFile setup_hs (path `combine` "Setup.hs")
   copyFile license (path `combine` "LICENSE")
@@ -79,6 +88,7 @@ render spec path = do
   where
     root = path `combine` "Cauterize"
     hsFile = renderHSFile spec
+    hsAiFile = renderAIFile spec
     cabalFileName = "caut-generated-" ++ libName spec ++ ".cabal"
     cabalFile = do
       setup_hs <- getDataFileName "lib.cabal"
