@@ -28,12 +28,16 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                  , linebreak
                  , typeSize
                  , linebreak
+                 , utils
+                 , linebreak
                  , typeSerialize
                  ]
 
     hsMod = "module Cauterize." <> (text . nameToCapHsName $ n) <> "AI" <+> "where"
 
     imports = vcat [ "import Cauterize." <> (text . nameToCapHsName $ n)
+                   , "import Cauterize.Support.Hs2010"
+                   , "import qualified Data.ByteString as B"
                    ]
 
     typeDecl = "data " <> aiTypeName <> typeAlts
@@ -45,8 +49,8 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
     typeSize = let i = "instance CauterizeSize" <+> aiTypeName <+> "where"
                    overhead = integer $ (AI.aiTypeLength ai) + (AI.aiDataLength ai)
                    cs = indent 2 $ vcat $
-                          ( "cautSize t =" <+> overhead <+> "+ case t of"
-                          : (map ((indent 19) . mkAltSize) ts))
+                          ( "cautSize t = fmap (" <> overhead <+> "+) $ case t of"
+                          : (map ((indent 29) . mkAltSize) ts))
                    mis = indent 2 $ vcat $
                           ( "minSize t =" <+> overhead <+> "+ case t of"
                           : (map ((indent 19) . mkAltMinSize) ts))
@@ -56,24 +60,28 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                in i <$> cs <$> mis <$> mas
 
     typeSerialize = let d = "aiPack" <> aiTypeName
-                        t = d <+> "::" <+> aiTypeName <+> "-> B.ByteString"
+                        t = d <+> "::" <+> aiTypeName <+> "-> Either String B.ByteString"
                         mk (AI.AiType ain _) =
                           let ain' = (text . nameToCapHsName . T.pack) ain
                           in d <+> parens ("Msg" <> ain' <+> "t") <+> "=" <+> (mkBody ain')
                         is = vcat $ map mk ts
                         mkBody ain =
-                          align $ vcat ["let" <+>
-                                          (align $ vcat [ "tbs = cauterizePack t"
-                                                        , "tagbs = B.pack tag" <> ain
-                                                        , "lbs = lenAsBs ((B.length tbs) + (B.length tagbs))"
+                          align $ vcat ["do" <+>
+                                          (align $ vcat [ "tbs <- cauterizePack t"
+                                                        , "let tagbs = B.pack tag" <> ain
+                                                        , "lbs <- lenAsBs ((B.length tbs) + (B.length tagbs))"
+                                                        , "return $ lbs `B.append` tagbs `B.append` tbs"
                                                         ])
-                                       ,"in lbs `B.append` tagbs `B.append` tbs"
                                        ]
-                    in t <$> is <$> (indent 2 "where") <$> (indent 4 $ "lenAsBs l = let l' = fromIntegral (bytesRequired (fromIntegral l)) ::" <+> byteCountToWordDoc (AI.aiDataLength ai))
-                                                                               <+> "in cauterizePack l'"
-                                                                                                       
-    typeGet = "cautGet = ???"                                                                          
-    typePut = "cautPut t = case t of" <$> indent 14 putters                                            
+                    in t <$> is 
+
+    utils = vcat [ "lenAsBs :: Integral a => a -> Either String B.ByteString"
+                 , "lenAsBs l = let l' = fromIntegral l ::" <+> byteCountToWordDoc (AI.aiDataLength ai)
+                           <+> "in cauterizePack l'"
+                 ]
+
+    typeGet = "cautGet = ???"
+    typePut = "cautPut t = case t of" <$> indent 14 putters
 
     putters = vcat $ map mkPutter ts
 
@@ -100,13 +108,13 @@ mkAlt :: AI.AiType -> Doc
 mkAlt t = msgName t <+> (text . nameToCapHsName . T.pack . AI.aiTypeName) t
 
 mkAltSize :: AI.AiType -> Doc
-mkAltSize t = msgName t <+> "t -> cautSize t"
+mkAltSize t = msgName t <+> "ty -> cautSize ty"
 
 mkAltMinSize :: AI.AiType -> Doc
-mkAltMinSize t = msgName t <+> "t -> minSize t"
+mkAltMinSize t = msgName t <+> "ty -> minSize ty"
 
 mkAltMaxSize :: AI.AiType -> Doc
-mkAltMaxSize t = msgName t <+> "t -> maxSize t"
+mkAltMaxSize t = msgName t <+> "ty -> maxSize ty"
 
 byteCountToWordDoc :: Integer -> Doc
 byteCountToWordDoc c | c == 1 = "U8"
