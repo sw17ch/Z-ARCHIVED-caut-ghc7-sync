@@ -37,7 +37,8 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                  , linebreak
                  , typeSerialize
                  , linebreak
-                 , typeDeserialize
+                 , typeDeserializeHeader
+                 , typeDeserializeData
                  ]
 
     hsMod = "module Cauterize." <> (text . nameToCapHsName $ n) <> "AI" <+> "where"
@@ -92,21 +93,29 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                                                         , "return $ lbs `B.append` tagbs `B.append` tbs"
                                                         ])]
                     in t <$> is 
-    typeDeserialize = let d = "aiUnpack" <> aiTypeName <+> "b = do" <+> rest
-                          t = "aiUnpack" <> aiTypeName <+> "::" <+> "B.ByteString -> Either String (" <> aiTypeName <>", " <> hdrName <> ")"
-                      in vcat [t, d]
+    hdrName = (text . nameToCapHsName . T.pack . AI.aiName) ai <> "AIHeader"
+    typeDeserializeHeader = let d = "aiUnpack" <> aiTypeName <> "Header b = do" <+> rest
+                                t = "aiUnpack" <> aiTypeName <> "Header" <+> "::" <+> "B.ByteString -> Either String (B.ByteString," <+> hdrName <> ")"
+                            in vcat [t, d]
       where
-        hdrName = (text . nameToCapHsName . T.pack . AI.aiName) ai <> "AIHeader"
         rest = align $ vcat $ [ "let (len,rest) = B.splitAt dataTagLength b"
                               , "let (tag,rest') = B.splitAt typeTagLength rest"
                               , "l <- cauterizeUnpack len"
-                              , "d <- case B.unpack tag of"
+                              , "return (rest', " <+> hdrName <+> "l (B.unpack tag))"
+                              ]
+    typeDeserializeData = let d = "aiUnpack" <> aiTypeName <> "Data (" <> hdrName <+> " len tag) b = do" <+> rest
+                              t = "aiUnpack" <> aiTypeName <> "Data" <+> "::" <+> hdrName <+> "-> B.ByteString -> Either String (B.ByteString," <+> aiTypeName <> ")"
+                          in vcat [t, d, theWhere]
+      where
+        indent' = indent 10 
+        rest = align $ vcat $ [ "d <- case tag of"
                               ] ++ matches ++ [defMatch] ++
-                              [ "return (d, " <+> hdrName <+> "l (B.unpack tag))"
+                              [ "return (rest, d)"
                               ]
         matches = map mkMatch ts
-        mkMatch (AI.AiType tn p) = "       [" <> hcat (map (text . T.pack . show) p) <> "] -> liftM Msg" <> text (nameToCapHsName $ T.pack tn) <+> "(cauterizeUnpack rest')"
-        defMatch                 = "       u -> Left $ \"Unexpected tag: \" ++ show u"
+        mkMatch (AI.AiType tn p) = indent' "[" <> hcat (map (text . T.pack . show) p) <> "] -> liftM Msg" <> text (nameToCapHsName $ T.pack tn) <+> "(cauterizeUnpack dataBS)"
+        defMatch = indent' "u -> Left $ \"Unexpected tag: \" ++ show u"
+        theWhere = indent 2 "where" <$> indent 4 "(dataBS, rest) = B.splitAt (fromIntegral len) b"
 
     utils = vcat [ "lenAsBs :: Integral a => a -> Either String B.ByteString"
                  , "lenAsBs l = let l' = fromIntegral l ::" <+> byteCountToWordDoc (AI.aiDataLength ai)
