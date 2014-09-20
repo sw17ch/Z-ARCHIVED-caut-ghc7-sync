@@ -4,11 +4,13 @@ import Cauterize.Specification
 import qualified Cauterize.AI as AI
 import Cauterize.Generators.Hs2010.Synchronous.HSFile
 import Cauterize.Generators.Hs2010.Synchronous.HSAiFile
+import Cauterize.Generators.Hs2010.Synchronous.Common
 
 import Options.Applicative
 import System.Directory
 import System.FilePath.Posix
 
+import Data.Text.Lazy as T
 import Data.Text.Lazy.IO as T
 
 import Paths_caut_hs2010_synchronous
@@ -105,4 +107,6 @@ render spec mai path = do
       setup_hs <- getDataFileName "lib.cabal"
       c <- Prelude.readFile setup_hs
       let nameLine = "name:                caut-generated-" ++ libName spec ++ "\n"
-      return $ nameLine ++ c
+      let n = T.unpack $ nameToCapHsName $ T.pack (libName spec)
+      let exposed = "  exposed-modules:     Cauterize." ++ n ++ ", Cauterize." ++ n ++ "AI"
+      return $ nameLine ++ c ++ exposed
