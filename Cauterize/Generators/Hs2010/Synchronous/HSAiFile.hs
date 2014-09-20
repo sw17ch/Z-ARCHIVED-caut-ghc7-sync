@@ -50,7 +50,7 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                    ]
 
     aiHeader = let htn = (text . nameToCapHsName $ n) <> "AIHeader"
-               in "data" <+> htn <+> "=" <+> htn <+> byteCountToWordDoc (AI.aiDataLength ai) <+> "[Word8]"
+               in "data" <+> htn <+> "=" <+> htn <+> byteCountToWordDoc (AI.aiDataLength ai) <+> "[Word8]" <+> "deriving (Show, Ord, Eq)"
 
     typeDecl = "data " <> aiTypeName <> typeAlts
                        <> linebreak <> (indent 2 "deriving (Show, Eq, Ord)")
