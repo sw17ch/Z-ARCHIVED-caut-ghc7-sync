@@ -41,13 +41,13 @@ renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
     imports = vcat [ "import qualified Data.Vector as V"
                    , "import Cauterize.Support.Hs2010"
                    , "import Control.Monad"
-                   -- , "import Control.Monad.Trans"
+                   , "import Control.Monad.Trans"
                    , "import Control.Monad.Trans.Except"
-                   -- , "import Data.Maybe"
+                   , "import Data.Maybe"
                    , "import qualified Data.Serialize.Get as S"
-                   -- , "import qualified Data.Serialize.Put as P"
-                   -- , "import qualified Data.ByteString as B"
-                   -- , "import Data.Bits as Bits"
+                   , "import qualified Data.Serialize.Put as P"
+                   , "import qualified Data.ByteString as B"
+                   , "import Data.Bits as Bits"
                    , "import qualified Test.QuickCheck as QC"
                    ]
 
