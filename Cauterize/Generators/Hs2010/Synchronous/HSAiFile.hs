@@ -24,6 +24,11 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                  , linebreak
                  , typeDecl
                  , linebreak
+                 , aiHeader
+                 , linebreak
+                 , typeTagLength
+                 , dataTagLength
+                 , linebreak
                  , typeTags
                  , linebreak
                  , typeSize
@@ -31,6 +36,8 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                  , utils
                  , linebreak
                  , typeSerialize
+                 , linebreak
+                 , typeDeserialize
                  ]
 
     hsMod = "module Cauterize." <> (text . nameToCapHsName $ n) <> "AI" <+> "where"
@@ -38,13 +45,25 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
     imports = vcat [ "import Cauterize." <> (text . nameToCapHsName $ n)
                    , "import Cauterize.Support.Hs2010"
                    , "import qualified Data.ByteString as B"
+                   , "import Data.Word"
+                   , "import Control.Monad"
                    ]
+
+    aiHeader = let htn = (text . nameToCapHsName $ n) <> "AIHeader"
+               in "data" <+> htn <+> "=" <+> htn <+> byteCountToWordDoc (AI.aiDataLength ai) <+> "[Word8]"
 
     typeDecl = "data " <> aiTypeName <> typeAlts
                        <> linebreak <> (indent 2 "deriving (Show, Eq, Ord)")
     typeAlts = encloseSep " = " empty " | " $ map mkAlt ts
 
+    typeTagLength = vcat [ "typeTagLength :: Num a => a"
+                         , "typeTagLength =" <+> integer (AI.aiTypeLength ai)
+                         ]
     typeTags = vcat $ map mkTag ts
+
+    dataTagLength = vcat [ "dataTagLength :: Num a => a"
+                         , "dataTagLength =" <+> integer (AI.aiDataLength ai)
+                         ]
 
     typeSize = let i = "instance CauterizeSize" <+> aiTypeName <+> "where"
                    overhead = integer $ (AI.aiTypeLength ai) + (AI.aiDataLength ai)
@@ -71,19 +90,28 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                                                         , "let tagbs = B.pack tag" <> ain
                                                         , "lbs <- lenAsBs ((B.length tbs) + (B.length tagbs))"
                                                         , "return $ lbs `B.append` tagbs `B.append` tbs"
-                                                        ])
-                                       ]
+                                                        ])]
                     in t <$> is 
+    typeDeserialize = let d = "aiUnpack" <> aiTypeName <+> "b = do" <+> rest
+                          t = "aiUnpack" <> aiTypeName <+> "::" <+> "B.ByteString -> Either String (" <> aiTypeName <>", " <> hdrName <> ")"
+                      in vcat [t, d]
+      where
+        hdrName = (text . nameToCapHsName . T.pack . AI.aiName) ai <> "AIHeader"
+        rest = align $ vcat $ [ "let (len,rest) = B.splitAt dataTagLength b"
+                              , "let (tag,rest') = B.splitAt typeTagLength rest"
+                              , "l <- cauterizeUnpack len"
+                              , "d <- case B.unpack tag of"
+                              ] ++ matches ++ [defMatch] ++
+                              [ "return (d, " <+> hdrName <+> "l (B.unpack tag))"
+                              ]
+        matches = map mkMatch ts
+        mkMatch (AI.AiType tn p) = "       [" <> hcat (map (text . T.pack . show) p) <> "] -> liftM Msg" <> text (nameToCapHsName $ T.pack tn) <+> "(cauterizeUnpack rest')"
+        defMatch                 = "       u -> Left $ \"Unexpected tag: \" ++ show u"
 
     utils = vcat [ "lenAsBs :: Integral a => a -> Either String B.ByteString"
                  , "lenAsBs l = let l' = fromIntegral l ::" <+> byteCountToWordDoc (AI.aiDataLength ai)
                            <+> "in cauterizePack l'"
                  ]
-
-    typeGet = "cautGet = ???"
-    typePut = "cautPut t = case t of" <$> indent 14 putters
-
-    putters = vcat $ map mkPutter ts
 
 mkTag :: AI.AiType -> Doc
 mkTag (AI.AiType n p) =
@@ -97,12 +125,6 @@ hsTypeName t = (text . nameToCapHsName . T.pack . AI.aiTypeName) t
 
 msgName :: AI.AiType -> Doc
 msgName t = "Msg" <> hsTypeName t
-
-mkPutter :: AI.AiType -> Doc
-mkPutter t = msgName t <+> "->" <+> rhs
-  where
-    rhs = vcat [ "mapM_ cautPut tag" <> hsTypeName t
-               ]
            
 mkAlt :: AI.AiType -> Doc
 mkAlt t = msgName t <+> (text . nameToCapHsName . T.pack . AI.aiTypeName) t

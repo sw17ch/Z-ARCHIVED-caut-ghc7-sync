@@ -8,9 +8,7 @@ import Cauterize.Common.Types
 import Cauterize.Generators.Hs2010.Synchronous.Common
 
 import Text.PrettyPrint.Leijen.Text
-import qualified Data.Text.Lazy as T
 import qualified Data.Map as M
-import Data.Maybe
 
 putFn :: Doc
 putFn = "cautPut"
