@@ -39,6 +39,7 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                  , linebreak
                  , typeDeserializeHeader
                  , typeDeserializeData
+                 , instanceArbitrary
                  ]
 
     hsMod = "module Cauterize." <> (text . nameToCapHsName $ n) <> "AI" <+> "where"
@@ -48,6 +49,8 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                    , "import qualified Data.ByteString as B"
                    , "import Data.Word"
                    , "import Control.Monad"
+                   , "import Test.QuickCheck.Arbitrary"
+                   , "import Test.QuickCheck.Gen"
                    ]
 
     aiHeader = let htn = (text . nameToCapHsName $ n) <> "AIHeader"
@@ -116,6 +119,17 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
         mkMatch (AI.AiType tn p) = indent' "[" <> hcat (map (text . T.pack . show) p) <> "] -> liftM Msg" <> text (nameToCapHsName $ T.pack tn) <+> "(cauterizeUnpack dataBS)"
         defMatch = indent' "u -> Left $ \"Unexpected tag: \" ++ show u"
         theWhere = indent 2 "where" <$> indent 4 "(dataBS, rest) = B.splitAt (fromIntegral len) b"
+
+    instanceArbitrary =
+      let inst = "instance Arbitrary" <+> aiTypeName <+> "where"
+          decl = indent 2 (vcat [ "arbitrary = oneof [" <+> (hcat $ punctuate "," (map (("arb" <>) . aiHsName) ts) ) <+> "]" 
+                                , "  where"
+                                ]) <$> rest
+          rest = indent 6 $ align $ vcat $ map arbAiType ts
+          aiHsName (AI.AiType tname _) = text . nameToCapHsName . T.pack $ tname
+          arbAiType t = let n' = aiHsName t
+                      in "arb" <> n' <+> "= liftM Msg" <> n' <+> "arbitrary"
+      in inst <$> decl
 
     utils = vcat [ "lenAsBs :: Integral a => a -> Either String B.ByteString"
                  , "lenAsBs l = let l' = fromIntegral l ::" <+> byteCountToWordDoc (AI.aiDataLength ai)
