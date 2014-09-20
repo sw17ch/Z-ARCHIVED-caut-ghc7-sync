@@ -116,7 +116,7 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                               [ "return (rest, d)"
                               ]
         matches = map mkMatch ts
-        mkMatch (AI.AiType tn p) = indent' "[" <> hcat (map (text . T.pack . show) p) <> "] -> liftM Msg" <> text (nameToCapHsName $ T.pack tn) <+> "(cauterizeUnpack dataBS)"
+        mkMatch (AI.AiType tn p) = indent' "[" <> (hcat $ punctuate ", " (map (text . T.pack . show) p)) <> "] -> liftM Msg" <> text (nameToCapHsName $ T.pack tn) <+> "(cauterizeUnpack dataBS)"
         defMatch = indent' "u -> Left $ \"Unexpected tag: \" ++ show u"
         theWhere = indent 2 "where" <$> indent 4 "(dataBS, rest) = B.splitAt (fromIntegral len) b"
 
