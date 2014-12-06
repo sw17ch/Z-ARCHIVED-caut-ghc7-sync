@@ -6,6 +6,7 @@ module Cauterize.Generators.Hs2010.Synchronous.Common
   , typeToVarNameDoc
   , hsFileName
   , hsAiFileName
+  , hsTsFileName
   , libName
   , biRepr
   , biReprText
@@ -48,6 +49,9 @@ hsAiFileName :: Spec -> FilePath
 hsAiFileName s = let part = nameToCapHsName $ T.pack $ specName s :: T.Text
                      suff = "AI.hs"
                  in T.unpack $ part `T.append` suff
+
+hsTsFileName :: Spec -> FilePath
+hsTsFileName _ = "test_server.hs"
 
 nameToCapHsName :: T.Text -> T.Text
 nameToCapHsName n = let terms = T.splitOn "_" n

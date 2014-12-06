@@ -4,14 +4,15 @@ import Cauterize.Specification
 import qualified Cauterize.AI as AI
 import Cauterize.Generators.Hs2010.Synchronous.HSFile
 import Cauterize.Generators.Hs2010.Synchronous.HSAiFile
+import Cauterize.Generators.Hs2010.Synchronous.TestServer
 import Cauterize.Generators.Hs2010.Synchronous.Common
 
 import Options.Applicative
 import System.Directory
 import System.FilePath.Posix
 
-import Data.Text.Lazy as T
-import Data.Text.Lazy.IO as T
+import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.IO as T
 
 import Paths_caut_hs2010_synchronous
 
@@ -91,7 +92,9 @@ render spec mai path = do
   T.writeFile (root `combine` hsFileName spec) hsFile
 
   case mai of
-    Just ai -> T.writeFile (root `combine` hsAiFileName spec) (hsAiFile ai)
+    Just ai -> do
+      T.writeFile (root `combine` hsAiFileName spec) (hsAiFile ai)
+      T.writeFile (path `combine` hsTsFileName spec) (renderTsFile ai)
     Nothing -> return ()
 
   Prelude.writeFile (path `combine` cabalFileName) cabalFileData
@@ -106,7 +109,26 @@ render spec mai path = do
     cabalFile = do
       setup_hs <- getDataFileName "lib.cabal"
       c <- Prelude.readFile setup_hs
-      let nameLine = "name:                caut-generated-" ++ libName spec ++ "\n"
+      let name = "caut-generated-" ++ libName spec
+      let nameLine = "name:                " ++ name  ++ "\n"
       let n = T.unpack $ nameToCapHsName $ T.pack (libName spec)
-      let exposed = "  exposed-modules:     Cauterize." ++ n ++ ", Cauterize." ++ n ++ "AI"
-      return $ nameLine ++ c ++ exposed
+      let exposed = "  exposed-modules:     Cauterize." ++ n ++ ", Cauterize." ++ n ++ "AI\n"
+      let exec = unlines [ "executable test_server"
+                         , "  ghc-options: -Wall"
+                         , "  ghc-options: -Wall"
+                         , "  default-language: Haskell2010"
+                         , "  main-is: test_server.hs"
+                         , "  build-depends: base >=4.6 && <4.8,"
+                         , "                 bytes,"
+                         , "                 bytestring,"
+                         , "                 QuickCheck >= 2.7.6,"
+                         , "                 vector >= 0.10.9.1,"
+                         , "                 mtl >= 2.2.1,"
+                         , "                 transformers >= 0.4.1.0,"
+                         , "                 cereal >= 0.4.0.1,"
+                         , "                 caut-hs2010-synchronous-support >= 0.1,"
+                         , "                 network,"
+                         , "                 " ++ name ++ ""
+                         ]
+
+      return $ nameLine ++ c ++ exposed ++ "\n" ++ exec

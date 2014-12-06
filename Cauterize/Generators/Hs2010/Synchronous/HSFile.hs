@@ -11,6 +11,7 @@ import Cauterize.Generators.Hs2010.Synchronous.Common
 import Cauterize.Generators.Hs2010.Synchronous.TypeDecl
 import Cauterize.Generators.Hs2010.Synchronous.TypeSize
 import Cauterize.Generators.Hs2010.Synchronous.TypePack
+import Cauterize.Generators.Hs2010.Synchronous.Functions
 import Cauterize.Generators.Hs2010.Synchronous.Special
 
 import qualified Data.Text.Lazy as T
@@ -25,6 +26,8 @@ renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
     r = renderPretty 0.4 80
     ts = specTypes s
     parts = vcat [ imports
+                 , linebreak
+                 , functions s
                  , linebreak
                  , typeDecls
                  , linebreak
@@ -44,6 +47,7 @@ renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
                    , "import Control.Monad.Trans"
                    , "import Control.Monad.Trans.Except"
                    , "import Data.Maybe"
+                   , "import Data.Word"
                    , "import qualified Data.Serialize.Get as S"
                    , "import qualified Data.Serialize.Put as P"
                    , "import qualified Data.ByteString as B"
