@@ -86,6 +86,7 @@ render spec mai path = do
 
   setup_hs <- getDataFileName "Setup.hs"
   license <- getDataFileName "lib_LICENSE"
+  test_server <- getDataFileName "Cauterize/TestServer.hs"
 
   cabalFileData <- cabalFile
 
@@ -100,6 +101,7 @@ render spec mai path = do
   Prelude.writeFile (path `combine` cabalFileName) cabalFileData
   copyFile setup_hs (path `combine` "Setup.hs")
   copyFile license (path `combine` "LICENSE")
+  copyFile test_server (root `combine` "TestServer.hs")
 
   where
     root = path `combine` "Cauterize"
