@@ -1,4 +1,10 @@
-module Cauterize.TestServer (server, Result(..)) where
+module Cauterize.TestServer
+  ( server
+  , Result(..)
+  , HeaderInfo(..)
+  , Interface(..)
+  , DataInfo(..)
+  ) where
 
 import Network.Socket hiding (send, recv)
 import Network.Socket.ByteString
@@ -10,16 +16,30 @@ import Control.Exception (IOException, catch)
 
 import Data.Word
 
+data HeaderInfo = HeaderInfo { dataLength :: Int, dataTag :: [Word8], headerRemainder :: B.ByteString }
+  deriving (Show)
+
+data DataInfo a = DataInfo { dataResult :: a, dataRemainder :: B.ByteString }
+  deriving (Show)
+
+data Interface a = Interface { headerLength :: Int
+                             , decodeHeader :: B.ByteString -> Maybe HeaderInfo
+                             , decodeData :: B.ByteString -> HeaderInfo -> Maybe (DataInfo a)
+                             , packAI :: a -> Maybe B.ByteString
+                             }
+
 data Result a = Success a
-              | FailBadDecode a
+              | FailBadDecodeHeader a
+              | FailBadDecodeData a
               | FailBadTag [Word8]
               | FailNotEq a a
+              | FailEncode
               | FailSocket
               | FailSpecHash
   deriving (Show, Eq)
 
-server :: (Arbitrary a, Eq a) => [Word8] -> IO [Result a]
-server specHash = withSocketsDo $ do
+server :: (Arbitrary a, Eq a) => Interface a -> [Word8] -> IO [Result a]
+server iface specHash = withSocketsDo $ do
   addrinfos <- getAddrInfo
                (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
                Nothing (Just "3000")
@@ -28,13 +48,13 @@ server specHash = withSocketsDo $ do
   bindSocket sock (addrAddress serveraddr)
   listen sock 1
   (conn, _) <- accept sock
-  r <- runTests specHash conn
+  r <- runTests iface specHash conn
   sClose conn
   sClose sock
   return r
 
-runTests :: (Arbitrary a, Eq a) => [Word8] -> Socket -> IO [Result a]
-runTests h s = work `catch` orFail
+runTests :: (Arbitrary a, Eq a) => Interface a -> [Word8] -> Socket -> IO [Result a]
+runTests iface h s = work `catch` orFail
   where
     orFail :: IOException -> IO [Result a]
     orFail _ = return [FailSocket]
@@ -47,12 +67,21 @@ runTests h s = work `catch` orFail
         then return [FailSpecHash]
         else do
           r <- generate arbitrary
-
-          -- Here's the part where I need to write the header out, write out
-          -- the data, then read the header and read the data.
-          _ <- send s $ B.pack [0x44, 0x45, 0x46] -- this is a dummy send for now
-
-          return [Success r]
+          let bin = packAI iface r
+          case bin of
+             Nothing -> return [FailEncode]
+             Just bin' -> do
+               _ <- send s bin'
+               hdrBin <- recvExactly s (headerLength iface)
+               let hdr = decodeHeader iface hdrBin
+               case hdr of
+                  Nothing -> return [FailBadDecodeHeader r]
+                  Just hdr' -> do
+                    datBin <- recvExactly s (dataLength hdr')
+                    let dat = decodeData iface datBin hdr'
+                    case dat of
+                      Nothing -> return [FailBadDecodeData r]
+                      Just (DataInfo dat' _) -> return [Success dat']
 
 recvExactly :: Socket -> Int -> IO B.ByteString
 recvExactly s len = do

@@ -14,6 +14,10 @@ renderTsFile ai = displayT . renderPretty 0.6 160 $ header
   where
     modName = (text . nameToCapHsName . T.pack . AI.aiName) ai 
     aiName = modName <> "AI"
+    unpackHeader = "aiUnpack" <> aiName <> "Header"
+    unpackData = "aiUnpack" <> aiName <> "Data"
+    packAll = "aiPack" <> aiName
+    headerType = aiName <> "Header"
     header = vcat [ "module Main where"
                   , linebreak
                   , "import Cauterize." <> aiName
@@ -22,7 +26,28 @@ renderTsFile ai = displayT . renderPretty 0.6 160 $ header
                   , linebreak
                   , "main :: IO ()"
                   , "main = do"
-                  , "  results <- server specHash :: IO [Result" <+> aiName <> "]"
+                  , "  results <- server iface specHash :: IO [Result" <+> aiName <> "]"
                   , "  print results"
+                  , "  where"
+                  , "    decHdr b = case" <+> unpackHeader <+> "b of"
+                  , "                Right (r," <+> headerType <+> "l t) ->"
+                  , "                  Just (HeaderInfo { dataLength = fromIntegral l"
+                  , "                                   , dataTag = t"
+                  , "                                   , headerRemainder = r"
+                  , "                                   })"
+                  , "                Left _ -> Nothing"
+                  , "    decData b (HeaderInfo l t _) = case" <+> unpackData <+> "(" <> headerType <+> "(fromIntegral l) t) b of"
+                  , "                    Right (r,d) ->"
+                  , "                      Just (DataInfo { dataResult = d"
+                  , "                                     , dataRemainder = r })"
+                  , "                    Left _ -> Nothing"
+                  , "    encData d = case" <+> packAll <+> "d of"
+                  , "                  Right d' -> Just d'"
+                  , "                  Left _ -> Nothing"
+                  , "    iface = Interface { headerLength = typeTagLength + dataTagLength"
+                  , "                      , decodeHeader = decHdr"
+                  , "                      , decodeData = decData"
+                  , "                      , packAI = encData"
+                  , "                      }"
                   ]
 
