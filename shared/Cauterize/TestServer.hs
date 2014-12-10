@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Cauterize.TestServer
   ( server
   , Result(..)
@@ -12,9 +13,10 @@ import qualified Data.ByteString as B
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 
-import Control.Exception (IOException, catch)
+import Control.Exception (Exception(..), IOException, catch, throw)
 
 import Data.Word
+import Data.Data
 
 data HeaderInfo = HeaderInfo { dataLength :: Int, dataTag :: [Word8], headerRemainder :: B.ByteString }
   deriving (Show)
@@ -35,6 +37,7 @@ data Result a = Success a
               | FailNotEq a a
               | FailEncode
               | FailSocket
+              | FailRecv
               | FailSpecHash
   deriving (Show, Eq)
 
@@ -48,47 +51,56 @@ server iface specHash = withSocketsDo $ do
   bindSocket sock (addrAddress serveraddr)
   listen sock 1
   (conn, _) <- accept sock
-  r <- runTests iface specHash conn
+  r <- runTest iface specHash conn
   sClose conn
   sClose sock
-  return r
+  return [r]
 
-runTests :: (Arbitrary a, Eq a) => Interface a -> [Word8] -> Socket -> IO [Result a]
-runTests iface h s = work `catch` orFail
+runTest :: (Arbitrary a, Eq a) => Interface a -> [Word8] -> Socket -> IO (Result a)
+runTest iface h s = work `catch` orFail
   where
-    orFail :: IOException -> IO [Result a]
-    orFail _ = return [FailSocket]
+    orFail :: IOException -> IO (Result a)
+    orFail _ = return FailSocket
 
     hashLen = length h
 
     work = do
       remoteHash <- recvExactly s hashLen
       if B.unpack remoteHash /= h
-        then return [FailSpecHash]
+        then return FailSpecHash
         else do
           r <- generate arbitrary
           let bin = packAI iface r
           case bin of
-             Nothing -> return [FailEncode]
+             Nothing -> return FailEncode
              Just bin' -> do
                _ <- send s bin'
                hdrBin <- recvExactly s (headerLength iface)
                let hdr = decodeHeader iface hdrBin
                case hdr of
-                  Nothing -> return [FailBadDecodeHeader r]
+                  Nothing -> return $ FailBadDecodeHeader r
                   Just hdr' -> do
                     datBin <- recvExactly s (dataLength hdr')
                     let dat = decodeData iface datBin hdr'
                     case dat of
-                      Nothing -> return [FailBadDecodeData r]
-                      Just (DataInfo dat' _) -> return [Success dat']
+                      Nothing -> return $ FailBadDecodeData r
+                      Just (DataInfo dat' _) -> return $ Success dat'
+
+newtype RemoteClosedEarly = RemoteClosedEarly B.ByteString
+  deriving (Show, Data, Typeable)
+
+instance Exception RemoteClosedEarly where
 
 recvExactly :: Socket -> Int -> IO B.ByteString
-recvExactly s len = do
+recvExactly s len = recvExactly' s len B.empty
+
+recvExactly' :: Socket -> Int -> B.ByteString -> IO B.ByteString
+recvExactly' s len cont = do
   d <- recv s len
   let rlen = B.length d
-  if rlen == len
-    then return d
-    else do
-      r <- recvExactly s (len - rlen)
-      return $ d `B.append` r
+  let d' = cont `B.append` d
+  if 0 == rlen
+  then throw $ RemoteClosedEarly d'
+  else if rlen == len
+          then return d'
+          else recvExactly' s (len - rlen) d'
