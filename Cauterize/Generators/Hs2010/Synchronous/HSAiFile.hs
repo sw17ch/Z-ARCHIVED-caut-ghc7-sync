@@ -92,7 +92,7 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                           align $ vcat ["do" <+>
                                           (align $ vcat [ "tbs <- cauterizePack t"
                                                         , "let tagbs = B.pack tag" <> ain
-                                                        , "lbs <- lenAsBs ((B.length tbs) + (B.length tagbs))"
+                                                        , "lbs <- lenAsBs (B.length tbs)"
                                                         , "return $ lbs `B.append` tagbs `B.append` tbs"
                                                         ])]
                     in t <$> is 
