@@ -4,15 +4,15 @@ module Cauterize.Generators.Hs2010.Synchronous.TestServer
   , renderTsFile
   ) where
 
-import qualified Cauterize.AI as AI
+import qualified Cauterize.Meta as M
 import qualified Data.Text.Lazy as T
 import Text.PrettyPrint.Leijen.Text
 import Cauterize.Generators.Hs2010.Synchronous.Common
 
-renderTsFile :: AI.Ai -> T.Text
-renderTsFile ai = displayT . renderPretty 0.6 160 $ header
+renderTsFile :: M.Meta -> T.Text
+renderTsFile meta = displayT . renderPretty 0.6 160 $ header
   where
-    modName = (text . nameToCapHsName . T.pack . AI.aiName) ai 
+    modName = (text . nameToCapHsName . T.pack . M.metaName) meta
     aiName = modName <> "AI"
     unpackHeader = "aiUnpack" <> aiName <> "Header"
     unpackData = "aiUnpack" <> aiName <> "Data"

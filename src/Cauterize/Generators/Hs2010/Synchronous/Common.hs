@@ -5,7 +5,7 @@ module Cauterize.Generators.Hs2010.Synchronous.Common
   , typeToTypeNameDoc
   , typeToVarNameDoc
   , hsFileName
-  , hsAiFileName
+  , hsMetaFileName
   , hsTsFileName
   , libName
   , biRepr
@@ -45,10 +45,10 @@ hsFileName s = let part = nameToCapHsName $ T.pack $ specName s :: T.Text
                    suff = ".hs"
                in T.unpack $ part `T.append` suff
 
-hsAiFileName :: Spec -> FilePath
-hsAiFileName s = let part = nameToCapHsName $ T.pack $ specName s :: T.Text
-                     suff = "AI.hs"
-                 in T.unpack $ part `T.append` suff
+hsMetaFileName :: Spec -> FilePath
+hsMetaFileName s = let part = nameToCapHsName $ T.pack $ specName s :: T.Text
+                       suff = "Meta.hs"
+                   in T.unpack $ part `T.append` suff
 
 hsTsFileName :: Spec -> FilePath
 hsTsFileName _ = "test_server.hs"

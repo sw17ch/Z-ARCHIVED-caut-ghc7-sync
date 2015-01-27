@@ -1,30 +1,30 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Cauterize.Generators.Hs2010.Synchronous.HSAiFile
-  ( hsAiFileName
-  , renderAIFile
+module Cauterize.Generators.Hs2010.Synchronous.HSMetaFile
+  ( hsMetaFileName
+  , renderMetaFile
   ) where
 
 import Cauterize.Specification
-import qualified Cauterize.AI as AI
+import qualified Cauterize.Meta as M
 
 import Cauterize.Generators.Hs2010.Synchronous.Common
 
 import qualified Data.Text.Lazy as T
 import Text.PrettyPrint.Leijen.Text
 
-renderAIFile :: Spec -> AI.Ai -> T.Text
-renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
+renderMetaFile :: Spec -> M.Meta -> T.Text
+renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
   where
     -- tm = specTypeMap spec
     n = T.pack $ specName spec
     r = renderPretty 0.4 80
-    ts = AI.aiTypes ai
+    ts = M.metaTypes meta
     aiTypeName = (text . nameToCapHsName) n <> "AI"
     parts = vcat [ imports
                  , linebreak
                  , typeDecl
                  , linebreak
-                 , aiHeader
+                 , metaHeader
                  , linebreak
                  , typeTagLength
                  , dataTagLength
@@ -53,24 +53,24 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                    , "import Test.QuickCheck.Gen"
                    ]
 
-    aiHeader = let htn = (text . nameToCapHsName $ n) <> "AIHeader"
-               in "data" <+> htn <+> "=" <+> htn <+> byteCountToWordDoc (AI.aiDataLength ai) <+> "[Word8]" <+> "deriving (Show, Ord, Eq)"
+    metaHeader = let htn = (text . nameToCapHsName $ n) <> "AIHeader"
+                 in "data" <+> htn <+> "=" <+> htn <+> byteCountToWordDoc (M.metaDataLength meta) <+> "[Word8]" <+> "deriving (Show, Ord, Eq)"
 
     typeDecl = "data " <> aiTypeName <> typeAlts
                        <> linebreak <> (indent 2 "deriving (Show, Eq, Ord)")
     typeAlts = encloseSep " = " empty " | " $ map mkAlt ts
 
     typeTagLength = vcat [ "typeTagLength :: Num a => a"
-                         , "typeTagLength =" <+> integer (AI.aiTypeLength ai)
+                         , "typeTagLength =" <+> integer (M.metaTypeLength meta)
                          ]
     typeTags = vcat $ map mkTag ts
 
     dataTagLength = vcat [ "dataTagLength :: Num a => a"
-                         , "dataTagLength =" <+> integer (AI.aiDataLength ai)
+                         , "dataTagLength =" <+> integer (M.metaDataLength meta)
                          ]
 
     typeSize = let i = "instance CauterizeSize" <+> aiTypeName <+> "where"
-                   overhead = integer $ (AI.aiTypeLength ai) + (AI.aiDataLength ai)
+                   overhead = integer $ (M.metaTypeLength meta) + (M.metaDataLength meta)
                    cs = indent 2 $ vcat $
                           ( "cautSize t = fmap (" <> overhead <+> "+) $ case t of"
                           : (map ((indent 29) . mkAltSize) ts))
@@ -84,19 +84,19 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
 
     typeSerialize = let d = "aiPack" <> aiTypeName
                         t = d <+> "::" <+> aiTypeName <+> "-> Either String B.ByteString"
-                        mk (AI.AiType ain _) =
-                          let ain' = (text . nameToCapHsName . T.pack) ain
-                          in d <+> parens ("Msg" <> ain' <+> "t") <+> "=" <+> (mkBody ain')
+                        mk (M.MetaType metan _) =
+                          let metan' = (text . nameToCapHsName . T.pack) metan
+                          in d <+> parens ("Msg" <> metan' <+> "t") <+> "=" <+> (mkBody metan')
                         is = vcat $ map mk ts
-                        mkBody ain =
+                        mkBody metan =
                           align $ vcat ["do" <+>
                                           (align $ vcat [ "tbs <- cauterizePack t"
-                                                        , "let tagbs = B.pack tag" <> ain
+                                                        , "let tagbs = B.pack tag" <> metan
                                                         , "lbs <- lenAsBs (B.length tbs)"
                                                         , "return $ lbs `B.append` tagbs `B.append` tbs"
                                                         ])]
-                    in t <$> is 
-    hdrName = (text . nameToCapHsName . T.pack . AI.aiName) ai <> "AIHeader"
+                    in t <$> is
+    hdrName = (text . nameToCapHsName . T.pack . M.metaName) meta <> "AIHeader"
     typeDeserializeHeader = let d = "aiUnpack" <> aiTypeName <> "Header b = do" <+> rest
                                 t = "aiUnpack" <> aiTypeName <> "Header" <+> "::" <+> "B.ByteString -> Either String (B.ByteString," <+> hdrName <> ")"
                             in vcat [t, d]
@@ -110,55 +110,55 @@ renderAIFile spec ai = displayT . r $ hsMod <> linebreak <$> parts
                               t = "aiUnpack" <> aiTypeName <> "Data" <+> "::" <+> hdrName <+> "-> B.ByteString -> Either String (B.ByteString," <+> aiTypeName <> ")"
                           in vcat [t, d, theWhere]
       where
-        indent' = indent 10 
+        indent' = indent 10
         rest = align $ vcat $ [ "d <- case tag of"
                               ] ++ matches ++ [defMatch] ++
                               [ "return (rest, d)"
                               ]
         matches = map mkMatch ts
-        mkMatch (AI.AiType tn p) = indent' "[" <> (hcat $ punctuate ", " (map (text . T.pack . show) p)) <> "] -> liftM Msg" <> text (nameToCapHsName $ T.pack tn) <+> "(cauterizeUnpack dataBS)"
+        mkMatch (M.MetaType tn p) = indent' "[" <> (hcat $ punctuate ", " (map (text . T.pack . show) p)) <> "] -> liftM Msg" <> text (nameToCapHsName $ T.pack tn) <+> "(cauterizeUnpack dataBS)"
         defMatch = indent' "u -> Left $ \"Unexpected tag: \" ++ show u"
         theWhere = indent 2 "where" <$> indent 4 "(dataBS, rest) = B.splitAt (fromIntegral len) b"
 
     instanceArbitrary =
       let inst = "instance Arbitrary" <+> aiTypeName <+> "where"
-          decl = indent 2 (vcat [ "arbitrary = oneof [" <+> (hcat $ punctuate "," (map (("arb" <>) . aiHsName) ts) ) <+> "]" 
+          decl = indent 2 (vcat [ "arbitrary = oneof [" <+> (hcat $ punctuate "," (map (("arb" <>) . metaHsName) ts) ) <+> "]"
                                 , "  where"
                                 ]) <$> rest
-          rest = indent 6 $ align $ vcat $ map arbAiType ts
-          aiHsName (AI.AiType tname _) = text . nameToCapHsName . T.pack $ tname
-          arbAiType t = let n' = aiHsName t
+          rest = indent 6 $ align $ vcat $ map arbMetaType ts
+          metaHsName (M.MetaType tname _) = text . nameToCapHsName . T.pack $ tname
+          arbMetaType t = let n' = metaHsName t
                       in "arb" <> n' <+> "= liftM Msg" <> n' <+> "arbitrary"
       in inst <$> decl
 
     utils = vcat [ "lenAsBs :: Integral a => a -> Either String B.ByteString"
-                 , "lenAsBs l = let l' = fromIntegral l ::" <+> byteCountToWordDoc (AI.aiDataLength ai)
+                 , "lenAsBs l = let l' = fromIntegral l ::" <+> byteCountToWordDoc (M.metaDataLength meta)
                            <+> "in cauterizePack l'"
                  ]
 
-mkTag :: AI.AiType -> Doc
-mkTag (AI.AiType n p) =
+mkTag :: M.MetaType -> Doc
+mkTag (M.MetaType n p) =
   let n' = "tag" <> (text . nameToCapHsName . T.pack) n
   in vcat [ n' <+> ":: [U8]"
           , n' <+> "= [" <+> (hcat $ punctuate  "," (map (text . T.pack . show) p)) <+> "]"
           ]
 
-hsTypeName :: AI.AiType -> Doc
-hsTypeName t = (text . nameToCapHsName . T.pack . AI.aiTypeName) t
+hsTypeName :: M.MetaType -> Doc
+hsTypeName t = (text . nameToCapHsName . T.pack . M.metaTypeName) t
 
-msgName :: AI.AiType -> Doc
+msgName :: M.MetaType -> Doc
 msgName t = "Msg" <> hsTypeName t
-           
-mkAlt :: AI.AiType -> Doc
-mkAlt t = msgName t <+> (text . nameToCapHsName . T.pack . AI.aiTypeName) t
 
-mkAltSize :: AI.AiType -> Doc
+mkAlt :: M.MetaType -> Doc
+mkAlt t = msgName t <+> (text . nameToCapHsName . T.pack . M.metaTypeName) t
+
+mkAltSize :: M.MetaType -> Doc
 mkAltSize t = msgName t <+> "ty -> cautSize ty"
 
-mkAltMinSize :: AI.AiType -> Doc
+mkAltMinSize :: M.MetaType -> Doc
 mkAltMinSize t = msgName t <+> "ty -> minSize ty"
 
-mkAltMaxSize :: AI.AiType -> Doc
+mkAltMaxSize :: M.MetaType -> Doc
 mkAltMaxSize t = msgName t <+> "ty -> maxSize ty"
 
 byteCountToWordDoc :: Integer -> Doc

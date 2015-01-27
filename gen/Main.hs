@@ -1,9 +1,9 @@
 module Main where
 
 import Cauterize.Specification
-import qualified Cauterize.AI as AI
+import qualified Cauterize.Meta as M
 import Cauterize.Generators.Hs2010.Synchronous.HSFile
-import Cauterize.Generators.Hs2010.Synchronous.HSAiFile
+import Cauterize.Generators.Hs2010.Synchronous.HSMetaFile
 import Cauterize.Generators.Hs2010.Synchronous.TestServer
 import Cauterize.Generators.Hs2010.Synchronous.Common
 
@@ -14,7 +14,7 @@ import System.FilePath.Posix
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.IO as T
 
-import Paths_caut_hs2010_synchronous
+import Paths_caut_hs2010_sync
 
 data CautHs2010Opts = CautHs2010Opts
   { inputFile :: String
@@ -30,10 +30,10 @@ optParser = CautHs2010Opts
    <> help "Input Cauterize specification file."
     )
   <*> (\m -> nullOption $ reader (\v -> return $ Just v) `mappend` m)
-    ( long "ai-input"
-   <> metavar "AI_FILE_PATH"
+    ( long "meta-input"
+   <> metavar "META_FILE_PATH"
    <> value Nothing
-   <> help "Input Agnostic Interface specification file."
+   <> help "Meta interface specification file."
     )
   <*> strOption
     ( long "output"
@@ -69,7 +69,7 @@ cautHs2010 opts = do
         Right s' -> case aiInputFile opts of
                       Nothing -> render s' Nothing out
                       Just aif -> do
-                        aif' <- AI.parseFile aif
+                        aif' <- M.parseFile aif
                         case aif' of
                           Left e -> print e
                           Right ai -> render s' (Just ai) out
@@ -79,7 +79,7 @@ createFullPath p [] = return p
 createFullPath p (d:ds) = let n = p `combine` d
                           in createDirectory n >> createFullPath n ds
 
-render :: Spec -> Maybe AI.Ai -> FilePath -> IO ()
+render :: Spec -> Maybe M.Meta -> FilePath -> IO ()
 render spec mai path = do
   createDirectory path
   createDirectory root
@@ -94,7 +94,7 @@ render spec mai path = do
 
   case mai of
     Just ai -> do
-      T.writeFile (root `combine` hsAiFileName spec) (hsAiFile ai)
+      T.writeFile (root `combine` hsMetaFileName spec) (hsMetaFile ai)
       T.writeFile (path `combine` hsTsFileName spec) (renderTsFile ai)
     Nothing -> return ()
 
@@ -106,7 +106,7 @@ render spec mai path = do
   where
     root = path `combine` "Cauterize"
     hsFile = renderHSFile spec
-    hsAiFile = renderAIFile spec
+    hsMetaFile = renderMetaFile spec
     cabalFileName = "caut-generated-" ++ libName spec ++ ".cabal"
     cabalFile = do
       setup_hs <- getDataFileName "lib.cabal"
@@ -114,7 +114,7 @@ render spec mai path = do
       let name = "caut-generated-" ++ libName spec
       let nameLine = "name:                " ++ name  ++ "\n"
       let n = T.unpack $ nameToCapHsName $ T.pack (libName spec)
-      let exposed = "  exposed-modules:     Cauterize." ++ n ++ ", Cauterize." ++ n ++ "AI\n"
+      let exposed = "  exposed-modules:     Cauterize." ++ n ++ ", Cauterize." ++ n ++ "Meta\n"
       let exec = unlines [ "executable test_server"
                          , "  ghc-options: -Wall"
                          , "  ghc-options: -Wall"
