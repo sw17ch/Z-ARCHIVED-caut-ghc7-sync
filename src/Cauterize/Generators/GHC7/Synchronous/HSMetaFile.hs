@@ -53,7 +53,7 @@ renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
                    , "import Test.QuickCheck.Gen"
                    ]
 
-    metaHeader = let htn = (text . nameToCapHsName $ n) <> "AIHeader"
+    metaHeader = let htn = (text . nameToCapHsName $ n) <> "MetaHeader"
                  in "data" <+> htn <+> "=" <+> htn <+> byteCountToWordDoc (M.metaDataLength meta) <+> "[Word8]" <+> "deriving (Show, Ord, Eq)"
 
     typeDecl = "data " <> metaTypeName <> typeAlts
@@ -88,7 +88,7 @@ renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
                                                               , "lbs <- lenAsBs (B.length tbs)"
                                                               , "return $ lbs `B.append` tagbs `B.append` tbs" ])]
                     in t <$> is
-    hdrName = (text . nameToCapHsName . T.pack . M.metaName) meta <> "AIHeader"
+    hdrName = (text . nameToCapHsName . T.pack . M.metaName) meta <> "MetaHeader"
     typeDeserializeHeader = let d = "aiUnpack" <> metaTypeName <> "Header b = do" <+> rest
                                 t = "aiUnpack" <> metaTypeName <> "Header" <+> "::" <+> "B.ByteString -> Either String (B.ByteString," <+> hdrName <> ")"
                             in vcat [t, d]

@@ -94,7 +94,7 @@ render spec mai path = do
   case mai of
     Just ai -> do
       T.writeFile (cautDir `combine` hsMetaFileName spec) (hsMetaFile ai)
-      T.writeFile (binDir `combine` hsTsFileName spec) (renderTsFile ai)
+      T.writeFile (binDir `combine` "Main.hs") (renderTsFile ai)
     Nothing -> return ()
 
   Prelude.writeFile (path `combine` cabalFileName) cabalFileData
@@ -116,7 +116,7 @@ render spec mai path = do
       let name = "caut-generated-" ++ libName spec
       let nameLine = "name:                " ++ name  ++ "\n"
       let n = T.unpack $ nameToCapHsName $ T.pack (libName spec)
-      let exposed = "  exposed-modules:     Cauterize." ++ n ++ ", Cauterize." ++ n ++ "Meta\n"
+      let exposed = "  exposed-modules:     Cauterize.TestServer, Cauterize." ++ n ++ ", Cauterize." ++ n ++ "Meta\n"
       let exec = unlines [ "executable test_server"
                          , "  hs-source-dirs: test_server/"
                          , "  ghc-options: -Wall"
@@ -132,7 +132,6 @@ render spec mai path = do
                          , "                 transformers >= 0.4.2.0,"
                          , "                 cereal >= 0.4.0.1,"
                          , "                 caut-ghc7-sync >= 0.1,"
-                         , "                 network >= 2.4.2.3,"
                          , "                 " ++ name ++ ""
                          ]
 
