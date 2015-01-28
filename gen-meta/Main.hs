@@ -8,6 +8,8 @@ import Cauterize.Generators.GHC7.Synchronous.TestServer
 import Cauterize.Generators.GHC7.Synchronous.Common
 
 import Options.Applicative
+import Control.Applicative
+import Control.Monad
 import System.Directory
 import System.FilePath.Posix
 
@@ -18,7 +20,7 @@ import Paths_caut_ghc7_sync
 
 data CautGHC7Opts = CautGHC7Opts
   { inputFile :: String
-  , metaInputFile :: String
+  , aiInputFile :: Maybe String
   , outputDirectory :: String
   } deriving (Show)
 
@@ -30,9 +32,10 @@ optParser = CautGHC7Opts
    <> help "Input Cauterize specification file."
     )
   -- <*> (\m -> nullOption $ reader (\v -> return $ Just v) `mappend` m)
-  <*> strOption
+  <*> (\m -> option $ auto (\v -> return $ Just v) `mappend` m)
     ( long "meta-input"
    <> metavar "META_FILE_PATH"
+   <> value Nothing
    <> help "Meta interface specification file."
     )
   <*> strOption
@@ -66,10 +69,13 @@ cautGHC7 opts = do
       s <- parseFile inFile
       case s of
         Left e -> print e
-        Right s' -> do aif' <- M.parseFile $ metaInputFile opts
-                       case aif' of
-                         Left e -> print e
-                         Right ai -> render s' (Just ai) out
+        Right s' -> case aiInputFile opts of
+                      Nothing -> render s' Nothing out
+                      Just aif -> do
+                        aif' <- M.parseFile aif
+                        case aif' of
+                          Left e -> print e
+                          Right ai -> render s' (Just ai) out
 
 createFullPath :: FilePath -> [FilePath] -> IO FilePath
 createFullPath p [] = return p

@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, ViewPatterns #-}
-module Cauterize.Generators.Hs2010.Synchronous.Common
+module Cauterize.Generators.GHC7.Synchronous.Common
   ( sNameToTypeNameDoc
   , sNameToVarNameDoc
   , typeToTypeNameDoc
@@ -21,7 +21,7 @@ module Cauterize.Generators.Hs2010.Synchronous.Common
   , nameFields
 
   , unpackScalarAs
-  , constAsRepr 
+  , constAsRepr
   , builtinAsUndefined
   , tyNameAsUndefined
   , unpackArrayAs
@@ -38,7 +38,7 @@ import Text.PrettyPrint.Leijen.Text
 import Data.Maybe
 
 libName :: Spec -> String
-libName s = specName s
+libName = specName
 
 hsFileName :: Spec -> FilePath
 hsFileName s = let part = nameToCapHsName $ T.pack $ specName s :: T.Text
@@ -112,7 +112,7 @@ asType :: Doc -> Doc -> Doc
 asType lhs rhs = lhs <+> "::" <+> rhs
 
 unpackScalarAs :: TScalar -> Doc -> Doc
-unpackScalarAs (TScalar n _) a = 
+unpackScalarAs (TScalar n _) a =
   let tnd = sNameToTypeNameDoc n
   in parens $ tnd <+> a
 
@@ -135,13 +135,13 @@ unpackVectorAs :: TVector -> Doc -> Doc
 unpackVectorAs (TVector n _ _) a =
   let tnd = sNameToTypeNameDoc n
   in parens $ tnd <+> a
-  
+
 lkup :: Name -> M.Map Name SpType -> SpType
 lkup n m = let e = error $ "MISTAKE: Unable to lookup name " ++ n ++ " in spec type map."
            in fromMaybe e $ n `M.lookup` m
 
 manyNames :: [Doc]
-manyNames = map (\i -> (text $ T.pack $ 'f':show i)) ([0..] :: [Integer])
+manyNames = map (\i -> text $ T.pack $ 'f':show i) ([0..] :: [Integer])
 
 nameFields :: [Field] -> [Doc]
 nameFields fs = mapMaybe go (zip fs manyNames)

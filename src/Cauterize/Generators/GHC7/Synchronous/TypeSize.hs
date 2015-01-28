@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Cauterize.Generators.Hs2010.Synchronous.TypeSize
+module Cauterize.Generators.GHC7.Synchronous.TypeSize
   ( typeSizer
   ) where
 
 import Cauterize.Specification
 import Cauterize.Common.Types
-import Cauterize.Generators.Hs2010.Synchronous.Common
+import Cauterize.Generators.GHC7.Synchronous.Common
 
 import Text.PrettyPrint.Leijen.Text
 import qualified Data.Map as M
@@ -25,19 +25,19 @@ typeSizer _ (BuiltIn {}) = empty
 typeSizer m t = let n = typeName t
                     inst = "instance CauterizeSize" <+> sNameToTypeNameDoc n <+> "where" <$> indent 2 (typeSizer' m t)
                 in inst <> linebreak
-                 
+
 typeSizer' :: M.Map Name SpType -> SpType -> Doc
 typeSizer' _ (BuiltIn {}) = error "Should never reach this."
 typeSizer' _ (Scalar s _ _) = hsep [sizeFn, unpackScalarAs s "x", "=", sizeFn, "x"]
 typeSizer' _ (Const c _ _) = hsep [sizeFn, "_ =", sizeFn, constAsRepr c]
 typeSizer' _ t@(Array (TArray _ _ l) _ s) =
-  varSizeInsts s $ 
+  varSizeInsts s $
     "cautSize (" <> typeToTypeNameDoc t <> " v) = "
      <> ifStmt (integer l <> " /= V.length v")
                "Nothing"
                "liftM V.sum $ V.mapM cautSize v"
 typeSizer' _ t@(Vector (TVector _ _ l) _ s (LengthRepr r)) =
-  varSizeInsts s $ 
+  varSizeInsts s $
     "cautSize (" <> typeToTypeNameDoc t <> " v) = "
      <> ifStmt (integer l <> " < V.length v") "Nothing" e
   where
@@ -76,7 +76,7 @@ typeSizer' _ (Enum (TEnum n (Fields fs)) _ s (TagRepr r)) =
   in varSizeInsts s $ "cautSize" <+> objName <+> "=" <+> e
 typeSizer' _ (Pad (TPad _ l) _ _) =
   vcat [ "cautSize _ = Just " <> integer l
-       ] 
+       ]
 
 enumFieldCaseMatch :: Doc -> Doc -> Field -> Doc
 enumFieldCaseMatch _ nameSpace (EmptyField n _) = nameSpace <> sNameToTypeNameDoc n <+> "->"

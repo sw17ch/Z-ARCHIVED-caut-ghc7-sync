@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Cauterize.Generators.Hs2010.Synchronous.TypeDecl
+module Cauterize.Generators.GHC7.Synchronous.TypeDecl
   ( typeDecl
   ) where
 
 import Cauterize.Specification
 import Cauterize.Common.Types
-import Cauterize.Generators.Hs2010.Synchronous.Common
+import Cauterize.Generators.GHC7.Synchronous.Common
 
 import Text.PrettyPrint.Leijen.Text
 import Data.Maybe
@@ -35,13 +35,13 @@ typeDecl' t@(Vector (TVector _ r _) _ _ _) =
 typeDecl' t@(Struct s _ _) =
   let tnd = typeToTypeNameDoc t
       prefix = typeToVarNameDoc t
-      sfs = unFields . structFields $ s 
+      sfs = unFields . structFields $ s
   in tnd `dataDecl` tnd <+>
     encloseSep "{ " (line <> "}") ", " (mapMaybe (structFieldDecl prefix) sfs)
 typeDecl' t@(Set s _ _ _) =
   let tnd = typeToTypeNameDoc t
       prefix = typeToVarNameDoc t
-      sfs = unFields . setFields $ s 
+      sfs = unFields . setFields $ s
   in tnd `dataDecl` tnd <+>
     encloseSep "{ " (line <> "}") ", " (map (setFieldDecl prefix) sfs)
 typeDecl' t@(Enum e _ _ _) =
@@ -78,7 +78,7 @@ setFieldDecl nameSpace f =
                       in fn' `asType` "Maybe" <+> fr'
   where
     fn' = nameSpace <> sNameToTypeNameDoc (fName f)
-    
+
 enumFieldDecl :: Doc -> Field -> Doc
 enumFieldDecl prefix (EmptyField fn _) = prefix <> sNameToTypeNameDoc fn
 enumFieldDecl prefix (Field fn fr _) = prefix <> sNameToTypeNameDoc fn <+> sNameToTypeNameDoc fr

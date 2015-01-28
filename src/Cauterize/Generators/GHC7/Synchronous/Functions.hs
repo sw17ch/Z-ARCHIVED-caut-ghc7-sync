@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Cauterize.Generators.Hs2010.Synchronous.Functions
+module Cauterize.Generators.GHC7.Synchronous.Functions
   ( functions
   ) where
 
@@ -7,7 +7,7 @@ import Cauterize.FormHash
 import Cauterize.Specification
 import Text.PrettyPrint.Leijen.Text
 
-import Cauterize.Generators.Hs2010.Synchronous.Common
+import Cauterize.Generators.GHC7.Synchronous.Common
 
 functions :: Spec -> Doc
 functions s = vcat (specHashFn s : hashLenFn : map typeHashFn (specTypes s))

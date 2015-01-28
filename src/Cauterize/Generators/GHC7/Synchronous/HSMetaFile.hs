@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Cauterize.Generators.Hs2010.Synchronous.HSMetaFile
+module Cauterize.Generators.GHC7.Synchronous.HSMetaFile
   ( hsMetaFileName
   , renderMetaFile
   ) where
@@ -7,7 +7,7 @@ module Cauterize.Generators.Hs2010.Synchronous.HSMetaFile
 import Cauterize.Specification
 import qualified Cauterize.Meta as M
 
-import Cauterize.Generators.Hs2010.Synchronous.Common
+import Cauterize.Generators.GHC7.Synchronous.Common
 
 import qualified Data.Text.Lazy as T
 import Text.PrettyPrint.Leijen.Text
@@ -19,7 +19,7 @@ renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
     n = T.pack $ specName spec
     r = renderPretty 0.4 80
     ts = M.metaTypes meta
-    aiTypeName = (text . nameToCapHsName) n <> "AI"
+    metaTypeName = (text . nameToCapHsName) n <> "Meta"
     parts = vcat [ imports
                  , linebreak
                  , typeDecl
@@ -42,10 +42,10 @@ renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
                  , instanceArbitrary
                  ]
 
-    hsMod = "module Cauterize." <> (text . nameToCapHsName $ n) <> "AI" <+> "where"
+    hsMod = "module Cauterize." <> (text . nameToCapHsName $ n) <> "Meta" <+> "where"
 
     imports = vcat [ "import Cauterize." <> (text . nameToCapHsName $ n)
-                   , "import Cauterize.Support.Hs2010"
+                   , "import Cauterize.Generators.GHC7.SynchronousSupport"
                    , "import qualified Data.ByteString as B"
                    , "import Data.Word"
                    , "import Control.Monad"
@@ -56,8 +56,8 @@ renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
     metaHeader = let htn = (text . nameToCapHsName $ n) <> "AIHeader"
                  in "data" <+> htn <+> "=" <+> htn <+> byteCountToWordDoc (M.metaDataLength meta) <+> "[Word8]" <+> "deriving (Show, Ord, Eq)"
 
-    typeDecl = "data " <> aiTypeName <> typeAlts
-                       <> linebreak <> (indent 2 "deriving (Show, Eq, Ord)")
+    typeDecl = "data " <> metaTypeName <> typeAlts
+                       <> linebreak <> indent 2 "deriving (Show, Eq, Ord)"
     typeAlts = encloseSep " = " empty " | " $ map mkAlt ts
 
     typeTagLength = vcat [ "typeTagLength :: Num a => a"
@@ -69,45 +69,37 @@ renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
                          , "dataTagLength =" <+> integer (M.metaDataLength meta)
                          ]
 
-    typeSize = let i = "instance CauterizeSize" <+> aiTypeName <+> "where"
-                   overhead = integer $ (M.metaTypeLength meta) + (M.metaDataLength meta)
-                   cs = indent 2 $ vcat $
-                          ( "cautSize t = fmap (" <> overhead <+> "+) $ case t of"
-                          : (map ((indent 29) . mkAltSize) ts))
-                   mis = indent 2 $ vcat $
-                          ( "minSize t =" <+> overhead <+> "+ case t of"
-                          : (map ((indent 19) . mkAltMinSize) ts))
-                   mas = indent 2 $ vcat $
-                          ( "maxSize t =" <+> overhead <+> "+ case t of"
-                          : (map ((indent 19) . mkAltMaxSize) ts))
+    typeSize = let i = "instance CauterizeSize" <+> metaTypeName <+> "where"
+                   overhead = integer $ M.metaTypeLength meta + M.metaDataLength meta
+                   cs = indent 2 $ vcat $ "cautSize t = fmap (" <> overhead <+> "+) $ case t of" : map (indent 29 . mkAltSize) ts
+                   mis = indent 2 $ vcat $ "minSize t =" <+> overhead <+> "+ case t of" : map (indent 19 . mkAltMinSize) ts
+                   mas = indent 2 $ vcat $ "maxSize t =" <+> overhead <+> "+ case t of" : map (indent 19 . mkAltMaxSize) ts
                in i <$> cs <$> mis <$> mas
 
-    typeSerialize = let d = "aiPack" <> aiTypeName
-                        t = d <+> "::" <+> aiTypeName <+> "-> Either String B.ByteString"
+    typeSerialize = let d = "aiPack" <> metaTypeName
+                        t = d <+> "::" <+> metaTypeName <+> "-> Either String B.ByteString"
                         mk (M.MetaType metan _) =
                           let metan' = (text . nameToCapHsName . T.pack) metan
-                          in d <+> parens ("Msg" <> metan' <+> "t") <+> "=" <+> (mkBody metan')
+                          in d <+> parens ("Msg" <> metan' <+> "t") <+> "=" <+> mkBody metan'
                         is = vcat $ map mk ts
                         mkBody metan =
-                          align $ vcat ["do" <+>
-                                          (align $ vcat [ "tbs <- cauterizePack t"
-                                                        , "let tagbs = B.pack tag" <> metan
-                                                        , "lbs <- lenAsBs (B.length tbs)"
-                                                        , "return $ lbs `B.append` tagbs `B.append` tbs"
-                                                        ])]
+                          align $ vcat ["do" <+> align ( vcat [ "tbs <- cauterizePack t"
+                                                              , "let tagbs = B.pack tag" <> metan
+                                                              , "lbs <- lenAsBs (B.length tbs)"
+                                                              , "return $ lbs `B.append` tagbs `B.append` tbs" ])]
                     in t <$> is
     hdrName = (text . nameToCapHsName . T.pack . M.metaName) meta <> "AIHeader"
-    typeDeserializeHeader = let d = "aiUnpack" <> aiTypeName <> "Header b = do" <+> rest
-                                t = "aiUnpack" <> aiTypeName <> "Header" <+> "::" <+> "B.ByteString -> Either String (B.ByteString," <+> hdrName <> ")"
+    typeDeserializeHeader = let d = "aiUnpack" <> metaTypeName <> "Header b = do" <+> rest
+                                t = "aiUnpack" <> metaTypeName <> "Header" <+> "::" <+> "B.ByteString -> Either String (B.ByteString," <+> hdrName <> ")"
                             in vcat [t, d]
       where
-        rest = align $ vcat $ [ "let (len,rest) = B.splitAt dataTagLength b"
-                              , "let (tag,rest') = B.splitAt typeTagLength rest"
-                              , "l <- cauterizeUnpack len"
-                              , "return (rest', " <+> hdrName <+> "l (B.unpack tag))"
-                              ]
-    typeDeserializeData = let d = "aiUnpack" <> aiTypeName <> "Data (" <> hdrName <+> " len tag) b = do" <+> rest
-                              t = "aiUnpack" <> aiTypeName <> "Data" <+> "::" <+> hdrName <+> "-> B.ByteString -> Either String (B.ByteString," <+> aiTypeName <> ")"
+        rest = align $ vcat [ "let (len,rest) = B.splitAt dataTagLength b"
+                            , "let (tag,rest') = B.splitAt typeTagLength rest"
+                            , "l <- cauterizeUnpack len"
+                            , "return (rest', " <+> hdrName <+> "l (B.unpack tag))"
+                            ]
+    typeDeserializeData = let d = "aiUnpack" <> metaTypeName <> "Data (" <> hdrName <+> " len tag) b = do" <+> rest
+                              t = "aiUnpack" <> metaTypeName <> "Data" <+> "::" <+> hdrName <+> "-> B.ByteString -> Either String (B.ByteString," <+> metaTypeName <> ")"
                           in vcat [t, d, theWhere]
       where
         indent' = indent 10
@@ -116,13 +108,13 @@ renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
                               [ "return (rest, d)"
                               ]
         matches = map mkMatch ts
-        mkMatch (M.MetaType tn p) = indent' "[" <> (hcat $ punctuate ", " (map (text . T.pack . show) p)) <> "] -> liftM Msg" <> text (nameToCapHsName $ T.pack tn) <+> "(cauterizeUnpack dataBS)"
+        mkMatch (M.MetaType tn p) = indent' "[" <> hcat (punctuate ", " (map (text . T.pack . show) p)) <> "] -> liftM Msg" <> text (nameToCapHsName $ T.pack tn) <+> "(cauterizeUnpack dataBS)"
         defMatch = indent' "u -> Left $ \"Unexpected tag: \" ++ show u"
         theWhere = indent 2 "where" <$> indent 4 "(dataBS, rest) = B.splitAt (fromIntegral len) b"
 
     instanceArbitrary =
-      let inst = "instance Arbitrary" <+> aiTypeName <+> "where"
-          decl = indent 2 (vcat [ "arbitrary = oneof [" <+> (hcat $ punctuate "," (map (("arb" <>) . metaHsName) ts) ) <+> "]"
+      let inst = "instance Arbitrary" <+> metaTypeName <+> "where"
+          decl = indent 2 (vcat [ "arbitrary = oneof [" <+> hcat (punctuate "," (map (("arb" <>) . metaHsName) ts)) <+> "]"
                                 , "  where"
                                 ]) <$> rest
           rest = indent 6 $ align $ vcat $ map arbMetaType ts
@@ -140,11 +132,11 @@ mkTag :: M.MetaType -> Doc
 mkTag (M.MetaType n p) =
   let n' = "tag" <> (text . nameToCapHsName . T.pack) n
   in vcat [ n' <+> ":: [U8]"
-          , n' <+> "= [" <+> (hcat $ punctuate  "," (map (text . T.pack . show) p)) <+> "]"
+          , n' <+> "= [" <+> hcat (punctuate  "," (map (text . T.pack . show) p)) <+> "]"
           ]
 
 hsTypeName :: M.MetaType -> Doc
-hsTypeName t = (text . nameToCapHsName . T.pack . M.metaTypeName) t
+hsTypeName = text . nameToCapHsName . T.pack . M.metaTypeName
 
 msgName :: M.MetaType -> Doc
 msgName t = "Msg" <> hsTypeName t

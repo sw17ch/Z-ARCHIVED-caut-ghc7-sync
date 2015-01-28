@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Cauterize.Generators.Hs2010.Synchronous.TestServer
+module Cauterize.Generators.GHC7.Synchronous.TestServer
   ( hsTsFileName
   , renderTsFile
   ) where
@@ -7,26 +7,26 @@ module Cauterize.Generators.Hs2010.Synchronous.TestServer
 import qualified Cauterize.Meta as M
 import qualified Data.Text.Lazy as T
 import Text.PrettyPrint.Leijen.Text
-import Cauterize.Generators.Hs2010.Synchronous.Common
+import Cauterize.Generators.GHC7.Synchronous.Common
 
 renderTsFile :: M.Meta -> T.Text
 renderTsFile meta = displayT . renderPretty 0.6 160 $ header
   where
     modName = (text . nameToCapHsName . T.pack . M.metaName) meta
-    aiName = modName <> "AI"
-    unpackHeader = "aiUnpack" <> aiName <> "Header"
-    unpackData = "aiUnpack" <> aiName <> "Data"
-    packAll = "aiPack" <> aiName
-    headerType = aiName <> "Header"
+    metaName = modName <> "Meta"
+    unpackHeader = "aiUnpack" <> metaName <> "Header"
+    unpackData = "aiUnpack" <> metaName <> "Data"
+    packAll = "aiPack" <> metaName
+    headerType = metaName <> "Header"
     header = vcat [ "module Main where"
                   , linebreak
-                  , "import Cauterize." <> aiName
+                  , "import Cauterize." <> metaName
                   , "import Cauterize." <> modName
                   , "import Cauterize.TestServer"
                   , linebreak
                   , "main :: IO ()"
                   , "main = do"
-                  , "  results <- server iface specHash :: IO [Result" <+> aiName <> "]"
+                  , "  results <- server iface specHash :: IO [Result" <+> metaName <> "]"
                   , "  print results"
                   , "  where"
                   , "    decHdr b = case" <+> unpackHeader <+> "b of"

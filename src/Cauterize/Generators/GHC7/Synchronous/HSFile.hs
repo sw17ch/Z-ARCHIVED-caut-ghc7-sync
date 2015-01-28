@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Cauterize.Generators.Hs2010.Synchronous.HSFile
+module Cauterize.Generators.GHC7.Synchronous.HSFile
   ( hsFileName
   , libName
   , renderHSFile
@@ -7,12 +7,12 @@ module Cauterize.Generators.Hs2010.Synchronous.HSFile
 
 import Cauterize.Specification
 
-import Cauterize.Generators.Hs2010.Synchronous.Common
-import Cauterize.Generators.Hs2010.Synchronous.TypeDecl
-import Cauterize.Generators.Hs2010.Synchronous.TypeSize
-import Cauterize.Generators.Hs2010.Synchronous.TypePack
-import Cauterize.Generators.Hs2010.Synchronous.Functions
-import Cauterize.Generators.Hs2010.Synchronous.Special
+import Cauterize.Generators.GHC7.Synchronous.Common
+import Cauterize.Generators.GHC7.Synchronous.TypeDecl
+import Cauterize.Generators.GHC7.Synchronous.TypeSize
+import Cauterize.Generators.GHC7.Synchronous.TypePack
+import Cauterize.Generators.GHC7.Synchronous.Functions
+import Cauterize.Generators.GHC7.Synchronous.Special
 
 import qualified Data.Text.Lazy as T
 import Text.PrettyPrint.Leijen.Text
@@ -42,7 +42,7 @@ renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
     hsMod = "module Cauterize." <> (text . nameToCapHsName $ n) <+> "where"
 
     imports = vcat [ "import qualified Data.Vector as V"
-                   , "import Cauterize.Support.Hs2010"
+                   , "import Cauterize.Generators.GHC7.SynchronousSupport"
                    , "import Control.Monad"
                    , "import Control.Monad.Trans"
                    , "import Control.Monad.Trans.Except"

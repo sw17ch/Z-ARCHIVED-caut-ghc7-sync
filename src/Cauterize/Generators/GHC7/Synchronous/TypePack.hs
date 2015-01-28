@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Cauterize.Generators.Hs2010.Synchronous.TypePack
+module Cauterize.Generators.GHC7.Synchronous.TypePack
   ( typePacker
   ) where
 
 import Cauterize.Specification
 import Cauterize.Common.Types
-import Cauterize.Generators.Hs2010.Synchronous.Common
+import Cauterize.Generators.GHC7.Synchronous.Common
 
 import Text.PrettyPrint.Leijen.Text
 import qualified Data.Map as M
@@ -20,7 +20,7 @@ typePacker :: M.Map Name SpType -> SpType -> Doc
 typePacker _ (BuiltIn {}) = empty
 typePacker m t = let n = typeName t
                      inst = "instance CauterizeSerialize" <+> sNameToTypeNameDoc n <+> "where"
-                              <$> indent 2 (align $ (typePacker' m t) <$> (typeUnpacker' m t))
+                              <$> indent 2 (align $ typePacker' m t <$> typeUnpacker' m t)
                  in inst <> linebreak
 
 typePacker' :: M.Map Name SpType -> SpType -> Doc
@@ -84,11 +84,12 @@ typeUnpacker' _ (Array (TArray n _ l) _ _) =
   in getFn <+> "=" <+> unpackArrayOfLen (integer l) n'
 typeUnpacker' _ (Vector (TVector n _ l) _ _ (LengthRepr lr)) =
   let n' = sNameToTypeNameDoc n
-  in getFn <+> "= do" <+> (align $ vcat [ "len <-" <+> getFn `asType` ("ExceptT String S.Get" <+> biRepr lr)
-                                        , "if len >" <+> integer l
-                                        , "  then throwE $ \"Invalid length unpacked: \" ++ show len"
-                                        , "  else" <+> unpackArrayOfLen "(fromIntegral len)" n'
-                                        ])
+      aligned = align $ vcat [ "len <-" <+> getFn `asType` ("ExceptT String S.Get" <+> biRepr lr)
+                             , "if len >" <+> integer l
+                             , "  then throwE $ \"Invalid length unpacked: \" ++ show len"
+                             , "  else" <+> unpackArrayOfLen "(fromIntegral len)" n'
+                             ]
+  in getFn <+> "= do" <+> aligned
 typeUnpacker' _ (Struct (TStruct n (Fields fs)) _ _) =
   let fNames = nameFields fs
       n' = sNameToTypeNameDoc n
@@ -99,10 +100,9 @@ typeUnpacker' _ (Set (TSet n (Fields fs)) _ _ (FlagsRepr fr)) =
   let fNames = take (length fs) manyNames
       n' = sNameToTypeNameDoc n
   in getFn <+> "= do" <+> align ( "flags <- cautGet :: ExceptT String S.Get" <+> biRepr fr
-                              <$> "if zeroBits /=" <+> parens ("Bits.complement" <+> int (((2 :: Int) ^ (length fs)) - 1) <+> ".&. flags")
+                              <$> "if zeroBits /=" <+> parens ("Bits.complement" <+> int (((2 :: Int) ^ length fs) - 1) <+> ".&. flags")
                               <$> "  then throwE $ \"Flags out of range. Flags were: \" ++ show flags"
-                              <$> "  else do" <+> ( align ( vcat (map setFieldGetter (zip fs fNames))
-                                                        <$> "return" <+> parens (n' <+> hsep fNames))))
+                              <$> "  else do" <+> ( align ( vcat (map setFieldGetter (zip fs fNames)) <$> "return" <+> parens (n' <+> hsep fNames))))
 typeUnpacker' _ t@(Enum (TEnum _ (Fields fs)) _ _ (TagRepr tr)) =
   let tnd = typeToTypeNameDoc t
   in getFn <+> " = do" <+> (align $ vcat [ "tag <- cautGet" `asType` "ExceptT String S.Get" <+> biRepr tr
@@ -162,4 +162,3 @@ enumFieldUnpacker prefix f =
   in tagMatch <+> case f of
                     EmptyField {} -> "return" <+> fn
                     Field {} -> "liftM" <+> fn <+> "cautGet"
-      

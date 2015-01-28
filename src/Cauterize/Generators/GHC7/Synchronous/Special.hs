@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Cauterize.Generators.Hs2010.Synchronous.Special
+module Cauterize.Generators.GHC7.Synchronous.Special
   ( arbInst
   ) where
 
 import Cauterize.Specification
 import Cauterize.Common.Types
-import Cauterize.Generators.Hs2010.Synchronous.Common
+import Cauterize.Generators.GHC7.Synchronous.Common
 
 import Text.PrettyPrint.Leijen.Text
 
@@ -21,6 +21,7 @@ arbInst t = let n = typeName t
                 inst = "instance QC.Arbitrary" <+> sNameToTypeNameDoc n <+> "where"
                        <$> indent 2 (arbInst' t)
             in inst <> linebreak
+
 arbInst' :: SpType -> Doc
 arbInst' (BuiltIn {}) = error "Should not ever reach this."
 arbInst' t@(Scalar {}) = 
@@ -31,29 +32,29 @@ arbInst' t@(Const {}) =
   in arbFn <+> "= return" <+> tnd
 arbInst' t@(Array (TArray _ _ al) _ _) =
   let tnd = typeToTypeNameDoc t
-  in arbFn <+> "= do" <+> (align (vcat [ "es <- QC.vectorOf" <+> integer al <+> qArbFn
-                                       , "return $" <+> tnd <+> "(V.fromList es)"
-                                       ]))
+  in arbFn <+> "= do" <+> align (vcat [ "es <- QC.vectorOf" <+> integer al <+> qArbFn 
+                                      , "return $" <+> tnd <+> "(V.fromList es)" ])
 arbInst' t@(Vector (TVector _ _ ml) _ _ _) =
   let tnd = typeToTypeNameDoc t
-  in arbFn <+> "= do" <+> (align (vcat [ "vl <- QC.choose (0," <> integer ml <> ")"
-                                       , "es <- QC.vectorOf vl" <+> qArbFn
-                                       , "return $" <+> tnd <+> "(V.fromList es)"
-                                       ]))
+  in arbFn <+> "= do" <+> align (vcat [ "vl <- QC.choose (0," <> integer ml <> ")"
+                                      , "es <- QC.vectorOf vl" <+> qArbFn
+                                      , "return $" <+> tnd <+> "(V.fromList es)" ])
 arbInst' t@(Struct (TStruct _ (Fields fs)) _ _) =
   let tnd = typeToTypeNameDoc t
       arbNs = nameFields fs
       arbs = map (\a -> a <+> "<-" <+> qArbFn) arbNs
-  in arbFn <+> "= do" <+> (align $ (vcat arbs) <$> ("return" <+> parens (tnd <+> hsep arbNs)))
+      aligned = align $ vcat arbs <$> "return" <+> parens (tnd <+> hsep arbNs)
+  in arbFn <+> "= do" <+> aligned
 arbInst' t@(Set (TSet _ (Fields fs)) _ _ _) =
   let tnd = typeToTypeNameDoc t
       arbNs = take (length fs) manyNames
       arbs = map (\a -> a <+> "<-" <+> qArbFn) arbNs
-  in arbFn <+> "= do" <+> (align $ (vcat arbs) <$> ("return" <+> parens (tnd <+> hsep arbNs)))
+      aligned = align $ vcat arbs <$> ("return" <+> parens (tnd <+> hsep arbNs))
+  in arbFn <+> "= do" <+> aligned
 arbInst' t@(Enum (TEnum _ (Fields fs)) _ _ _) =
   let arbFieldFns = map (arbEnumField $ typeToTypeNameDoc t) fs
   in arbFn <+> "= QC.oneof" <+> encloseSep "[ " " ]" ", " arbFieldFns
-  
+
 arbInst' t@(Pad {}) =
   let tnd = typeToTypeNameDoc t
   in arbFn <+> "= return" <+> tnd
