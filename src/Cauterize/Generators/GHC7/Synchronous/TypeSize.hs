@@ -28,8 +28,7 @@ typeSizer m t = let n = typeName t
 
 typeSizer' :: M.Map Name SpType -> SpType -> Doc
 typeSizer' _ (BuiltIn {}) = error "Should never reach this."
-typeSizer' _ (Scalar s _ _) = hsep [sizeFn, unpackScalarAs s "x", "=", sizeFn, "x"]
-typeSizer' _ (Const c _ _) = hsep [sizeFn, "_ =", sizeFn, constAsRepr c]
+typeSizer' _ (Synonym s _ _) = hsep [sizeFn, unpackSynonymAs s "x", "=", sizeFn, "x"]
 typeSizer' _ t@(Array (TArray _ _ l) _ s) =
   varSizeInsts s $
     "cautSize (" <> typeToTypeNameDoc t <> " v) = "
@@ -45,15 +44,15 @@ typeSizer' _ t@(Vector (TVector _ _ l) _ s (LengthRepr r)) =
                              , "elemSize <- liftM V.sum $ V.mapM cautSize v"
                              , "return $ lengthSize + elemSize"
                              ])
-typeSizer' _ (Struct (TStruct n (Fields fs)) _ s) =
+typeSizer' _ (Record (TRecord n (Fields fs)) _ s) =
   let objName = "s"
-      fsizes = mapMaybe (structFieldSizer objName $ sNameToVarNameDoc n) fs
+      fsizes = mapMaybe (recordFieldSizer objName $ sNameToVarNameDoc n) fs
       doblk = "liftM sum $ sequence " <+> align (encloseSep "[ " (line <> "]") ", " fsizes)
   in varSizeInsts s $ "cautSize" <+> objName <+> "=" <+> doblk
-typeSizer' _ (Set (TSet n (Fields fs)) _ s (FlagsRepr r)) =
+typeSizer' _ (Combination (TCombination n (Fields fs)) _ s (FlagsRepr r)) =
   let objName = "s"
       repName = biRepr r
-      fsizes = mapMaybe (setFieldSizer objName $ sNameToVarNameDoc n) fs
+      fsizes = mapMaybe (combinationFieldSizer objName $ sNameToVarNameDoc n) fs
   in varSizeInsts s $
     "cautSize" <+> objName <+> "=" <+>
       "do" <+> align (vcat [ "flagsSize <- cautSize (undefined :: " <> repName <> ")"
@@ -61,12 +60,12 @@ typeSizer' _ (Set (TSet n (Fields fs)) _ s (FlagsRepr r)) =
                               align (encloseSep "[ " (line <> "]") ", " fsizes)
                            , "return $ flagsSize + fieldsSize"
                            ])
-typeSizer' _ (Enum (TEnum n (Fields fs)) _ s (TagRepr r)) =
+typeSizer' _ (Union (TUnion n (Fields fs)) _ s (TagRepr r)) =
   let objName = "e"
       fieldVar = "e'"
       repName = biRepr r
-      enumCase f = let lhs = enumFieldCaseMatch fieldVar (sNameToTypeNameDoc n) f
-                       rhs = enumFieldSizer fieldVar f
+      enumCase f = let lhs = unionFieldCaseMatch fieldVar (sNameToTypeNameDoc n) f
+                       rhs = unionFieldSizer fieldVar f
                    in lhs <+> rhs
       fcases = map enumCase fs
       caseBlob = align $ "e of" <$> vcat fcases
@@ -74,26 +73,23 @@ typeSizer' _ (Enum (TEnum n (Fields fs)) _ s (TagRepr r)) =
                        <$> "fieldsSize <- case " <> align caseBlob
                        <$> "return $ repSize + fieldsSize")
   in varSizeInsts s $ "cautSize" <+> objName <+> "=" <+> e
-typeSizer' _ (Pad (TPad _ l) _ _) =
-  vcat [ "cautSize _ = Just " <> integer l
-       ]
 
-enumFieldCaseMatch :: Doc -> Doc -> Field -> Doc
-enumFieldCaseMatch _ nameSpace (EmptyField n _) = nameSpace <> sNameToTypeNameDoc n <+> "->"
-enumFieldCaseMatch var nameSpace (Field n _ _) = nameSpace <> sNameToTypeNameDoc n <+> var <+> "->"
+unionFieldCaseMatch :: Doc -> Doc -> Field -> Doc
+unionFieldCaseMatch _ nameSpace (EmptyField n _) = nameSpace <> sNameToTypeNameDoc n <+> "->"
+unionFieldCaseMatch var nameSpace (Field n _ _) = nameSpace <> sNameToTypeNameDoc n <+> var <+> "->"
 
-enumFieldSizer :: Doc -> Field -> Doc
-enumFieldSizer _ (EmptyField {}) = "Just 0"
-enumFieldSizer fieldVar (Field {}) = "cautSize" <+> fieldVar
+unionFieldSizer :: Doc -> Field -> Doc
+unionFieldSizer _ (EmptyField {}) = "Just 0"
+unionFieldSizer fieldVar (Field {}) = "cautSize" <+> fieldVar
 
-structFieldSizer :: Doc -> Doc -> Field -> Maybe Doc
-structFieldSizer _ _ (EmptyField _ _) = Nothing
-structFieldSizer objName nameSpace (Field n _ _) = Just $
+recordFieldSizer :: Doc -> Doc -> Field -> Maybe Doc
+recordFieldSizer _ _ (EmptyField _ _) = Nothing
+recordFieldSizer objName nameSpace (Field n _ _) = Just $
   "cautSize" <+> parens (nameSpace <> sNameToTypeNameDoc n <+> objName)
 
-setFieldSizer :: Doc -> Doc -> Field -> Maybe Doc
-setFieldSizer _ _ (EmptyField _ _) = Nothing
-setFieldSizer objName nameSpace f = Just $
+combinationFieldSizer :: Doc -> Doc -> Field -> Maybe Doc
+combinationFieldSizer _ _ (EmptyField _ _) = Nothing
+combinationFieldSizer objName nameSpace f = Just $
   "maybe (Just 0) cautSize" <+> parens (nameSpace <> sNameToTypeNameDoc (fName f) <+> objName)
 
 varSizeInsts :: Sized s => s -> Doc -> Doc

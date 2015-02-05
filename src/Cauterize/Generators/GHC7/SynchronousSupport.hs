@@ -11,13 +11,16 @@ module Cauterize.Generators.GHC7.SynchronousSupport
   , U8
   , U16
   , U32
+  , Cu8
+  , Cu16
+  , Cu32
   , U64
   , S8
   , S16
   , S32
   , S64
-  , Ieee754s
-  , Ieee754d
+  , F32
+  , F64
   , Bool
   ) where
 
@@ -73,23 +76,29 @@ type U8 = Word8
 type U16 = Word16
 type U32 = Word32
 type U64 = Word64
+type Cu8 = Word8
+type Cu16 = Word16
+type Cu32 = Word32
 type S8 = Int8
 type S16 = Int16
 type S32 = Int32
 type S64 = Int64
-type Ieee754s = Float
-type Ieee754d = Double
+type F32 = Float
+type F64 = Double
 -- Just use Haskell's Bool for the built-in bool.
 
 justConst :: a -> b -> Maybe a
 justConst a _ = Just a
 
+-- Covers both Cu8 and U8
 instance CauterizeSize U8 where
   cautSize = justConst 1
 
+-- Covers both Cu16 and U16
 instance CauterizeSize U16 where
   cautSize = justConst 2
 
+-- Covers both Cu32 and U32
 instance CauterizeSize U32 where
   cautSize = justConst 4
 
@@ -108,10 +117,10 @@ instance CauterizeSize S32 where
 instance CauterizeSize S64 where
   cautSize = justConst 8
 
-instance CauterizeSize Ieee754s where
+instance CauterizeSize F32 where
   cautSize = justConst 4
 
-instance CauterizeSize Ieee754d where
+instance CauterizeSize F64 where
   cautSize = justConst 8
 
 instance CauterizeSize Bool where
@@ -123,14 +132,17 @@ cput x = lift $ serializeLE x
 cget :: SerialEndian a => ExceptT String S.Get a
 cget = lift deserializeLE
 
+-- Covers both Cu8 and U8
 instance CauterizeSerialize U8 where
   cautPut x = lift $ serialize x
   cautGet = lift deserialize
 
+-- Covers both Cu16 and U16
 instance CauterizeSerialize U16 where
   cautPut = cput
   cautGet = cget
 
+-- Covers both Cu32 and U32
 instance CauterizeSerialize U32 where
   cautPut = cput
   cautGet = cget
@@ -155,11 +167,11 @@ instance CauterizeSerialize S64 where
   cautPut = cput
   cautGet = cget
 
-instance CauterizeSerialize Ieee754s where
+instance CauterizeSerialize F32 where
   cautPut = cput
   cautGet = cget
 
-instance CauterizeSerialize Ieee754d where
+instance CauterizeSerialize F64 where
   cautPut = cput
   cautGet = cget
 

@@ -24,12 +24,9 @@ arbInst t = let n = typeName t
 
 arbInst' :: SpType -> Doc
 arbInst' (BuiltIn {}) = error "Should not ever reach this."
-arbInst' t@(Scalar {}) = 
+arbInst' t@(Synonym {}) = 
   let tnd = typeToTypeNameDoc t
   in arbFn <+> "= liftM" <+> tnd <+> qArbFn
-arbInst' t@(Const {}) =
-  let tnd = typeToTypeNameDoc t
-  in arbFn <+> "= return" <+> tnd
 arbInst' t@(Array (TArray _ _ al) _ _) =
   let tnd = typeToTypeNameDoc t
   in arbFn <+> "= do" <+> align (vcat [ "es <- QC.vectorOf" <+> integer al <+> qArbFn 
@@ -39,26 +36,22 @@ arbInst' t@(Vector (TVector _ _ ml) _ _ _) =
   in arbFn <+> "= do" <+> align (vcat [ "vl <- QC.choose (0," <> integer ml <> ")"
                                       , "es <- QC.vectorOf vl" <+> qArbFn
                                       , "return $" <+> tnd <+> "(V.fromList es)" ])
-arbInst' t@(Struct (TStruct _ (Fields fs)) _ _) =
+arbInst' t@(Record (TRecord _ (Fields fs)) _ _) =
   let tnd = typeToTypeNameDoc t
       arbNs = nameFields fs
       arbs = map (\a -> a <+> "<-" <+> qArbFn) arbNs
       aligned = align $ vcat arbs <$> "return" <+> parens (tnd <+> hsep arbNs)
   in arbFn <+> "= do" <+> aligned
-arbInst' t@(Set (TSet _ (Fields fs)) _ _ _) =
+arbInst' t@(Combination (TCombination _ (Fields fs)) _ _ _) =
   let tnd = typeToTypeNameDoc t
       arbNs = take (length fs) manyNames
       arbs = map (\a -> a <+> "<-" <+> qArbFn) arbNs
       aligned = align $ vcat arbs <$> ("return" <+> parens (tnd <+> hsep arbNs))
   in arbFn <+> "= do" <+> aligned
-arbInst' t@(Enum (TEnum _ (Fields fs)) _ _ _) =
-  let arbFieldFns = map (arbEnumField $ typeToTypeNameDoc t) fs
+arbInst' t@(Union (TUnion _ (Fields fs)) _ _ _) =
+  let arbFieldFns = map (arbUnionField $ typeToTypeNameDoc t) fs
   in arbFn <+> "= QC.oneof" <+> encloseSep "[ " " ]" ", " arbFieldFns
 
-arbInst' t@(Pad {}) =
-  let tnd = typeToTypeNameDoc t
-  in arbFn <+> "= return" <+> tnd
-
-arbEnumField :: Doc -> Field -> Doc
-arbEnumField prefix (EmptyField n _) = "return" <+> prefix <> sNameToTypeNameDoc n
-arbEnumField prefix (Field n _ _) = "liftM" <+> prefix <> sNameToTypeNameDoc n <+> qArbFn
+arbUnionField :: Doc -> Field -> Doc
+arbUnionField prefix (EmptyField n _) = "return" <+> prefix <> sNameToTypeNameDoc n
+arbUnionField prefix (Field n _ _) = "liftM" <+> prefix <> sNameToTypeNameDoc n <+> qArbFn

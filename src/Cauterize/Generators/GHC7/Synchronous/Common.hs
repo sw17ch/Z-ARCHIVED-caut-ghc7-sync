@@ -20,8 +20,7 @@ module Cauterize.Generators.GHC7.Synchronous.Common
   , manyNames
   , nameFields
 
-  , unpackScalarAs
-  , constAsRepr
+  , unpackSynonymAs
   , builtinAsUndefined
   , tyNameAsUndefined
   , unpackArrayAs
@@ -85,12 +84,15 @@ biReprText BIu8 = "U8"
 biReprText BIu16 = "U16"
 biReprText BIu32 = "U32"
 biReprText BIu64 = "U64"
+biReprText BIcu8 = "Cu8"
+biReprText BIcu16 = "Cu16"
+biReprText BIcu32 = "Cu32"
 biReprText BIs8 = "S8"
 biReprText BIs16 = "S16"
 biReprText BIs32 = "S32"
 biReprText BIs64 = "S64"
-biReprText BIieee754s = "Ieee754s"
-biReprText BIieee754d = "Ieee754d"
+biReprText BIf32 = "F32"
+biReprText BIf64 = "F64"
 biReprText BIbool = "Bool"
 
 ifStmt :: Doc -> Doc -> Doc -> Doc
@@ -111,14 +113,10 @@ fieldDecl nameSpace (Field fn fr _) =
 asType :: Doc -> Doc -> Doc
 asType lhs rhs = lhs <+> "::" <+> rhs
 
-unpackScalarAs :: TScalar -> Doc -> Doc
-unpackScalarAs (TScalar n _) a =
+unpackSynonymAs :: TSynonym -> Doc -> Doc
+unpackSynonymAs (TSynonym n _) a =
   let tnd = sNameToTypeNameDoc n
   in parens $ tnd <+> a
-
-constAsRepr :: TConst -> Doc
-constAsRepr (TConst _ BIbool v) = parens (integer v `asType` biRepr BIu8)
-constAsRepr (TConst _ b v) = parens (integer v `asType` biRepr b)
 
 builtinAsUndefined :: BuiltIn -> Doc
 builtinAsUndefined b = tyNameAsUndefined (biRepr b)
