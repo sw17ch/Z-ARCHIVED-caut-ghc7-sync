@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Cauterize.Specification
@@ -17,9 +18,9 @@ import qualified Data.Text.Lazy.IO as T
 import Paths_caut_ghc7_sync
 
 data CautGHC7Opts = CautGHC7Opts
-  { inputFile :: String
-  , metaInputFile :: String
-  , outputDirectory :: String
+  { inputFile :: FilePath
+  , metaInputFile :: FilePath
+  , outputDirectory :: FilePath
   } deriving (Show)
 
 optParser :: Parser CautGHC7Opts
@@ -97,7 +98,7 @@ render spec mai path = do
       T.writeFile (binDir `combine` "Main.hs") (renderTsFile ai)
     Nothing -> return ()
 
-  Prelude.writeFile (path `combine` cabalFileName) cabalFileData
+  T.writeFile (path `combine` cabalFileName) cabalFileData
   copyFile setup_hs (path `combine` "Setup.hs")
   copyFile license (path `combine` "LICENSE")
   copyFile test_server (cautDir `combine` "TestServer.hs")
@@ -109,30 +110,30 @@ render spec mai path = do
 
     hsFile = renderHSFile spec
     hsMetaFile = renderMetaFile spec
-    cabalFileName = "caut-generated-" ++ libName spec ++ ".cabal"
+    cabalFileName = "caut-generated-" ++ (T.unpack . libName) spec ++ ".cabal"
     cabalFile = do
       setup_hs <- getDataFileName "lib.cabal"
-      c <- Prelude.readFile setup_hs
-      let name = "caut-generated-" ++ libName spec
-      let nameLine = "name:                " ++ name  ++ "\n"
-      let n = T.unpack $ nameToCapHsName $ T.pack (libName spec)
-      let exposed = "  exposed-modules:     Cauterize.TestServer, Cauterize." ++ n ++ ", Cauterize." ++ n ++ "Meta\n"
-      let exec = unlines [ "executable test_server"
-                         , "  hs-source-dirs: test_server/"
-                         , "  ghc-options: -Wall"
-                         , "  ghc-options: -Wall"
-                         , "  default-language: Haskell2010"
-                         , "  main-is: Main.hs"
-                         , "  build-depends: base >=4.6 && <4.8,"
-                         , "                 bytes,"
-                         , "                 bytestring,"
-                         , "                 QuickCheck >= 2.7.6,"
-                         , "                 vector >= 0.10.9.1,"
-                         , "                 mtl >= 2.1.3.1,"
-                         , "                 transformers >= 0.4.2.0,"
-                         , "                 cereal >= 0.4.0.1,"
-                         , "                 caut-ghc7-sync >= 0.1,"
-                         , "                 " ++ name ++ ""
-                         ]
+      c <- T.readFile setup_hs
+      let name = "caut-generated-" `T.append` libName spec
+      let nameLine = "name:                " `T.append` name `T.append` "\n"
+      let n = nameToCapHsName $ libName spec
+      let exposed = T.concat["  exposed-modules:     Cauterize.TestServer, Cauterize.", n, ", Cauterize.", n, "Meta\n"]
+      let exec = T.unlines [ "executable test_server"
+                           , "  hs-source-dirs: test_server/"
+                           , "  ghc-options: -Wall"
+                           , "  ghc-options: -Wall"
+                           , "  default-language: Haskell2010"
+                           , "  main-is: Main.hs"
+                           , "  build-depends: base >=4.6 && <4.8,"
+                           , "                 bytes,"
+                           , "                 bytestring,"
+                           , "                 QuickCheck >= 2.7.6,"
+                           , "                 vector >= 0.10.9.1,"
+                           , "                 mtl >= 2.1.3.1,"
+                           , "                 transformers >= 0.4.2.0,"
+                           , "                 cereal >= 0.4.0.1,"
+                           , "                 caut-ghc7-sync >= 0.1,"
+                           , "                 " `T.append` name `T.append` ""
+                           ]
 
-      return $ nameLine ++ c ++ exposed ++ "\n" ++ exec
+      return $ nameLine `T.append` c `T.append` exposed `T.append` "\n" `T.append` exec

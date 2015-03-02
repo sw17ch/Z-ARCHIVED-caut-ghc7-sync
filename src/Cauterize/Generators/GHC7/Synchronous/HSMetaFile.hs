@@ -16,7 +16,7 @@ renderMetaFile :: Spec -> M.Meta -> T.Text
 renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
   where
     -- tm = specTypeMap spec
-    n = T.pack $ specName spec
+    n = specName spec
     r = renderPretty 0.4 80
     ts = M.metaTypes meta
     metaTypeName = (text . nameToCapHsName) n <> "Meta"
@@ -79,7 +79,7 @@ renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
     typeSerialize = let d = "aiPack" <> metaTypeName
                         t = d <+> "::" <+> metaTypeName <+> "-> Either String B.ByteString"
                         mk (M.MetaType metan _) =
-                          let metan' = (text . nameToCapHsName . T.pack) metan
+                          let metan' = (text . nameToCapHsName) metan
                           in d <+> parens ("Msg" <> metan' <+> "t") <+> "=" <+> mkBody metan'
                         is = vcat $ map mk ts
                         mkBody metan =
@@ -88,7 +88,7 @@ renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
                                                               , "lbs <- lenAsBs (B.length tbs)"
                                                               , "return $ lbs `B.append` tagbs `B.append` tbs" ])]
                     in t <$> is
-    hdrName = (text . nameToCapHsName . T.pack . M.metaName) meta <> "MetaHeader"
+    hdrName = (text . nameToCapHsName . M.metaName) meta <> "MetaHeader"
     typeDeserializeHeader = let d = "aiUnpack" <> metaTypeName <> "Header b = do" <+> rest
                                 t = "aiUnpack" <> metaTypeName <> "Header" <+> "::" <+> "B.ByteString -> Either String (B.ByteString," <+> hdrName <> ")"
                             in vcat [t, d]
@@ -108,7 +108,7 @@ renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
                               [ "return (rest, d)"
                               ]
         matches = map mkMatch ts
-        mkMatch (M.MetaType tn p) = indent' "[" <> hcat (punctuate ", " (map (text . T.pack . show) p)) <> "] -> liftM Msg" <> text (nameToCapHsName $ T.pack tn) <+> "(cauterizeUnpack dataBS)"
+        mkMatch (M.MetaType tn p) = indent' "[" <> hcat (punctuate ", " (map (text . T.pack . show) p)) <> "] -> liftM Msg" <> text (nameToCapHsName tn) <+> "(cauterizeUnpack dataBS)"
         defMatch = indent' "u -> Left $ \"Unexpected tag: \" ++ show u"
         theWhere = indent 2 "where" <$> indent 4 "(dataBS, rest) = B.splitAt (fromIntegral len) b"
 
@@ -118,7 +118,7 @@ renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
                                 , "  where"
                                 ]) <$> rest
           rest = indent 6 $ align $ vcat $ map arbMetaType ts
-          metaHsName (M.MetaType tname _) = text . nameToCapHsName . T.pack $ tname
+          metaHsName (M.MetaType tname _) = text . nameToCapHsName $ tname
           arbMetaType t = let n' = metaHsName t
                       in "arb" <> n' <+> "= liftM Msg" <> n' <+> "arbitrary"
       in inst <$> decl
@@ -130,19 +130,19 @@ renderMetaFile spec meta = displayT . r $ hsMod <> linebreak <$> parts
 
 mkTag :: M.MetaType -> Doc
 mkTag (M.MetaType n p) =
-  let n' = "tag" <> (text . nameToCapHsName . T.pack) n
+  let n' = "tag" <> (text . nameToCapHsName) n
   in vcat [ n' <+> ":: [U8]"
           , n' <+> "= [" <+> hcat (punctuate  "," (map (text . T.pack . show) p)) <+> "]"
           ]
 
 hsTypeName :: M.MetaType -> Doc
-hsTypeName = text . nameToCapHsName . T.pack . M.metaTypeName
+hsTypeName = text . nameToCapHsName . M.metaTypeName
 
 msgName :: M.MetaType -> Doc
 msgName t = "Msg" <> hsTypeName t
 
 mkAlt :: M.MetaType -> Doc
-mkAlt t = msgName t <+> (text . nameToCapHsName . T.pack . M.metaTypeName) t
+mkAlt t = msgName t <+> (text . nameToCapHsName . M.metaTypeName) t
 
 mkAltSize :: M.MetaType -> Doc
 mkAltSize t = msgName t <+> "ty -> cautSize ty"

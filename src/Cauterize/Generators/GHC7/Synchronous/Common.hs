@@ -36,16 +36,16 @@ import qualified Data.Map as M
 import Text.PrettyPrint.Leijen.Text
 import Data.Maybe
 
-libName :: Spec -> String
+libName :: Spec -> T.Text
 libName = specName
 
 hsFileName :: Spec -> FilePath
-hsFileName s = let part = nameToCapHsName $ T.pack $ specName s :: T.Text
+hsFileName s = let part = nameToCapHsName $ specName s
                    suff = ".hs"
                in T.unpack $ part `T.append` suff
 
 hsMetaFileName :: Spec -> FilePath
-hsMetaFileName s = let part = nameToCapHsName $ T.pack $ specName s :: T.Text
+hsMetaFileName s = let part = nameToCapHsName $ specName s
                        suff = "Meta.hs"
                    in T.unpack $ part `T.append` suff
 
@@ -64,11 +64,11 @@ nameToHsName n = let (f:rest) = T.splitOn "_" n
                      cap t = C.toUpper (T.head t) `T.cons` T.tail t
                  in T.concat $ f:map cap rest
 
-sNameToTypeNameDoc :: String -> Doc
-sNameToTypeNameDoc = text . nameToCapHsName . T.pack
+sNameToTypeNameDoc :: T.Text -> Doc
+sNameToTypeNameDoc = text . nameToCapHsName
 
-sNameToVarNameDoc :: String -> Doc
-sNameToVarNameDoc = text . nameToHsName . T.pack
+sNameToVarNameDoc :: T.Text -> Doc
+sNameToVarNameDoc = text . nameToHsName
 
 typeToTypeNameDoc :: SpType -> Doc
 typeToTypeNameDoc = sNameToTypeNameDoc . typeName
@@ -135,7 +135,7 @@ unpackVectorAs (TVector n _ _) a =
   in parens $ tnd <+> a
 
 lkup :: Name -> M.Map Name SpType -> SpType
-lkup n m = let e = error $ "MISTAKE: Unable to lookup name " ++ n ++ " in spec type map."
+lkup n m = let e = error $ "MISTAKE: Unable to lookup name " ++ T.unpack n ++ " in spec type map."
            in fromMaybe e $ n `M.lookup` m
 
 manyNames :: [Doc]

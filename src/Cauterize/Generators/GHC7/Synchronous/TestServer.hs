@@ -12,7 +12,7 @@ import Cauterize.Generators.GHC7.Synchronous.Common
 renderTsFile :: M.Meta -> T.Text
 renderTsFile meta = displayT . renderPretty 0.6 160 $ header
   where
-    modName = (text . nameToCapHsName . T.pack . M.metaName) meta
+    modName = (text . nameToCapHsName . M.metaName) meta
     metaName = modName <> "Meta"
     unpackHeader = "aiUnpack" <> metaName <> "Header"
     unpackData = "aiUnpack" <> metaName <> "Data"

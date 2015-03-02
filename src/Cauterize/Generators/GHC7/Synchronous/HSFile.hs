@@ -22,7 +22,7 @@ renderHSFile :: Spec -> T.Text
 renderHSFile s = displayT . r $ hsMod <> linebreak <$> parts
   where
     tm = specTypeMap s
-    n = T.pack $ specName s
+    n = specName s
     r = renderPretty 0.4 80
     ts = specTypes s
     parts = vcat [ imports
