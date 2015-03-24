@@ -19,9 +19,9 @@ import qualified Data.Text.Lazy.IO as T
 import Paths_caut_ghc7_sync
 
 data CautGHC7Opts = CautGHC7Opts
-  { inputFile :: String
-  , aiInputFile :: Maybe String
-  , outputDirectory :: String
+  { inputFile :: FilePath
+  , aiInputFile :: FilePath
+  , outputDirectory :: FilePath
   } deriving (Show)
 
 optParser :: Parser CautGHC7Opts

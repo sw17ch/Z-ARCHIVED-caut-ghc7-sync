@@ -26,13 +26,13 @@ data CautGHC7Opts = CautGHC7Opts
 optParser :: Parser CautGHC7Opts
 optParser = CautGHC7Opts
   <$> strOption
-    ( long "input"
+    ( long "spec"
    <> metavar "FILE_PATH"
    <> help "Input Cauterize specification file."
     )
   -- <*> (\m -> nullOption $ reader (\v -> return $ Just v) `mappend` m)
   <*> strOption
-    ( long "meta-input"
+    ( long "meta"
    <> metavar "META_FILE_PATH"
    <> help "Meta interface specification file."
     )
