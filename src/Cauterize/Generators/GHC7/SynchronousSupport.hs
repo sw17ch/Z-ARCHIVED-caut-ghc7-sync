@@ -11,9 +11,6 @@ module Cauterize.Generators.GHC7.SynchronousSupport
   , U8
   , U16
   , U32
-  , Cu8
-  , Cu16
-  , Cu32
   , U64
   , S8
   , S16
@@ -76,9 +73,6 @@ type U8 = Word8
 type U16 = Word16
 type U32 = Word32
 type U64 = Word64
-type Cu8 = Word8
-type Cu16 = Word16
-type Cu32 = Word32
 type S8 = Int8
 type S16 = Int16
 type S32 = Int32
